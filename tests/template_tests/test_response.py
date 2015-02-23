@@ -1,16 +1,19 @@
 from __future__ import unicode_literals
 
-from datetime import datetime
 import os
 import pickle
 import time
+from datetime import datetime
 
-from django.test import RequestFactory, SimpleTestCase
 from django.conf import settings
 from django.template import Context, engines
-from django.template.response import (TemplateResponse, SimpleTemplateResponse,
-                                      ContentNotRenderedError)
-from django.test import ignore_warnings, override_settings
+from django.template.response import (
+    ContentNotRenderedError, SimpleTemplateResponse, TemplateResponse,
+)
+from django.test import (
+    RequestFactory, SimpleTestCase, ignore_warnings, override_settings,
+)
+from django.test.utils import require_jinja2
 from django.utils._os import upath
 from django.utils.deprecation import RemovedInDjango20Warning
 
@@ -132,6 +135,15 @@ class SimpleTemplateResponseTest(SimpleTestCase):
         response = SimpleTemplateResponse('', {}, 'application/json', 504)
         self.assertEqual(response['content-type'], 'application/json')
         self.assertEqual(response.status_code, 504)
+
+    @require_jinja2
+    def test_using(self):
+        response = SimpleTemplateResponse('template_tests/using.html').render()
+        self.assertEqual(response.content, b'DTL\n')
+        response = SimpleTemplateResponse('template_tests/using.html', using='django').render()
+        self.assertEqual(response.content, b'DTL\n')
+        response = SimpleTemplateResponse('template_tests/using.html', using='jinja2').render()
+        self.assertEqual(response.content, b'Jinja2\n')
 
     def test_post_callbacks(self):
         "Rendering a template response triggers the post-render callbacks"
@@ -260,6 +272,16 @@ class TemplateResponseTest(SimpleTestCase):
         self.assertEqual(response['content-type'], 'application/json')
         self.assertEqual(response.status_code, 504)
 
+    @require_jinja2
+    def test_using(self):
+        request = self.factory.get('/')
+        response = TemplateResponse(request, 'template_tests/using.html').render()
+        self.assertEqual(response.content, b'DTL\n')
+        response = TemplateResponse(request, 'template_tests/using.html', using='django').render()
+        self.assertEqual(response.content, b'DTL\n')
+        response = TemplateResponse(request, 'template_tests/using.html', using='jinja2').render()
+        self.assertEqual(response.content, b'Jinja2\n')
+
     @ignore_warnings(category=RemovedInDjango20Warning)
     def test_custom_app(self):
         self._response('{{ foo }}', current_app="foobar")
@@ -313,7 +335,7 @@ class TemplateResponseTest(SimpleTestCase):
 
 
 @override_settings(
-    MIDDLEWARE_CLASSES=list(settings.MIDDLEWARE_CLASSES) + [
+    MIDDLEWARE_CLASSES=settings.MIDDLEWARE_CLASSES + [
         'template_tests.test_response.CustomURLConfMiddleware'
     ],
     ROOT_URLCONF='template_tests.urls',
@@ -328,7 +350,7 @@ class CustomURLConfTest(SimpleTestCase):
 
 @override_settings(
     CACHE_MIDDLEWARE_SECONDS=2.0,
-    MIDDLEWARE_CLASSES=list(settings.MIDDLEWARE_CLASSES) + [
+    MIDDLEWARE_CLASSES=settings.MIDDLEWARE_CLASSES + [
         'django.middleware.cache.FetchFromCacheMiddleware',
         'django.middleware.cache.UpdateCacheMiddleware',
     ],

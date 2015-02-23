@@ -7,8 +7,8 @@ import os
 import shutil
 
 from django.apps import apps
-from django.db import connection, models
-from django.core.management import call_command, CommandError
+from django.core.management import CommandError, call_command
+from django.db import DatabaseError, connection, models
 from django.db.migrations import questioner
 from django.test import ignore_warnings, mock, override_settings
 from django.utils import six
@@ -45,6 +45,65 @@ class MigrateTests(MigrationTestBase):
         self.assertTableExists("migrations_author")
         self.assertTableNotExists("migrations_tribble")
         self.assertTableExists("migrations_book")
+        # Unmigrate everything
+        call_command("migrate", "migrations", "zero", verbosity=0)
+        # Make sure it's all gone
+        self.assertTableNotExists("migrations_author")
+        self.assertTableNotExists("migrations_tribble")
+        self.assertTableNotExists("migrations_book")
+
+    @override_settings(MIGRATION_MODULES={"migrations": "migrations.test_migrations"})
+    def test_migrate_fake_initial(self):
+        """
+        #24184 - Tests that --fake-initial only works if all tables created in
+        the initial migration of an app exists
+        """
+        # Make sure no tables are created
+        self.assertTableNotExists("migrations_author")
+        self.assertTableNotExists("migrations_tribble")
+        # Run the migrations to 0001 only
+        call_command("migrate", "migrations", "0001", verbosity=0)
+        # Make sure the right tables exist
+        self.assertTableExists("migrations_author")
+        self.assertTableExists("migrations_tribble")
+        # Fake a roll-back
+        call_command("migrate", "migrations", "zero", fake=True, verbosity=0)
+        # Make sure the tables still exist
+        self.assertTableExists("migrations_author")
+        self.assertTableExists("migrations_tribble")
+        # Try to run initial migration
+        with self.assertRaises(DatabaseError):
+            call_command("migrate", "migrations", "0001", verbosity=0)
+        # Run initial migration with an explicit --fake-initial
+        out = six.StringIO()
+        with mock.patch('django.core.management.color.supports_color', lambda *args: False):
+            call_command("migrate", "migrations", "0001", fake_initial=True, stdout=out, verbosity=1)
+        self.assertIn(
+            "migrations.0001_initial... faked",
+            out.getvalue().lower()
+        )
+        # Run migrations all the way
+        call_command("migrate", verbosity=0)
+        # Make sure the right tables exist
+        self.assertTableExists("migrations_author")
+        self.assertTableNotExists("migrations_tribble")
+        self.assertTableExists("migrations_book")
+        # Fake a roll-back
+        call_command("migrate", "migrations", "zero", fake=True, verbosity=0)
+        # Make sure the tables still exist
+        self.assertTableExists("migrations_author")
+        self.assertTableNotExists("migrations_tribble")
+        self.assertTableExists("migrations_book")
+        # Try to run initial migration
+        with self.assertRaises(DatabaseError):
+            call_command("migrate", "migrations", verbosity=0)
+        # Run initial migration with an explicit --fake-initial
+        with self.assertRaises(DatabaseError):
+            # Fails because "migrations_tribble" does not exist but needs to in
+            # order to make --fake-initial work.
+            call_command("migrate", "migrations", fake_initial=True, verbosity=0)
+        # Fake a apply
+        call_command("migrate", "migrations", fake=True, verbosity=0)
         # Unmigrate everything
         call_command("migrate", "migrations", "zero", verbosity=0)
         # Make sure it's all gone
@@ -360,7 +419,7 @@ class MakeMigrationsTests(MigrationTestBase):
                 self.assertIn('\\u201c\\xd0j\\xe1\\xf1g\\xf3\\u201d', content)  # title.default
 
     def test_failing_migration(self):
-        #21280 - If a migration fails to serialize, it shouldn't generate an empty file.
+        # If a migration fails to serialize, it shouldn't generate an empty file. #21280
         apps.register_model('migrations', UnserializableModel)
 
         with six.assertRaisesRegex(self, ValueError, r'Cannot serialize'):
@@ -504,7 +563,7 @@ class MakeMigrationsTests(MigrationTestBase):
             self.fail("Makemigrations failed while running interactive questioner")
         finally:
             questioner.input = old_input
-        self.assertIn("Created new merge migration", out.getvalue())
+        self.assertIn("Created new merge migration", force_text(out.getvalue()))
 
     @override_settings(MIGRATION_MODULES={"migrations": "migrations.test_migrations_conflict"})
     def test_makemigrations_handle_merge(self):
@@ -513,14 +572,15 @@ class MakeMigrationsTests(MigrationTestBase):
         """
         out = six.StringIO()
         call_command("makemigrations", "migrations", merge=True, interactive=False, stdout=out)
-        self.assertIn("Merging migrations", out.getvalue())
-        self.assertIn("Branch 0002_second", out.getvalue())
-        self.assertIn("Branch 0002_conflicting_second", out.getvalue())
+        output = force_text(out.getvalue())
+        self.assertIn("Merging migrations", output)
+        self.assertIn("Branch 0002_second", output)
+        self.assertIn("Branch 0002_conflicting_second", output)
         merge_file = os.path.join(self.test_dir, 'test_migrations_conflict', '0003_merge.py')
         self.assertTrue(os.path.exists(merge_file))
         os.remove(merge_file)
         self.assertFalse(os.path.exists(merge_file))
-        self.assertIn("Created new merge migration", out.getvalue())
+        self.assertIn("Created new merge migration", output)
 
     @override_settings(MIGRATION_MODULES={"migrations": "migrations.test_migrations_no_default"})
     def test_makemigrations_dry_run(self):
@@ -738,7 +798,7 @@ class SquashMigrationsTest(MigrationTestBase):
         """
         out = six.StringIO()
         call_command("squashmigrations", "migrations", "0002", interactive=False, verbosity=1, stdout=out)
-        self.assertIn("Optimized from 7 operations to 5 operations.", out.getvalue())
+        self.assertIn("Optimized from 7 operations to 5 operations.", force_text(out.getvalue()))
 
     @override_settings(MIGRATION_MODULES={"migrations": "migrations.test_migrations"})
     def test_ticket_23799_squashmigrations_no_optimize(self):
@@ -748,4 +808,4 @@ class SquashMigrationsTest(MigrationTestBase):
         out = six.StringIO()
         call_command("squashmigrations", "migrations", "0002",
                      interactive=False, verbosity=1, no_optimize=True, stdout=out)
-        self.assertIn("Skipping optimization", out.getvalue())
+        self.assertIn("Skipping optimization", force_text(out.getvalue()))

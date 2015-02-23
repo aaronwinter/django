@@ -1,11 +1,16 @@
 from django.apps import apps
-from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
+from django.contrib.contenttypes.fields import (
+    GenericForeignKey, GenericRelation,
+)
 from django.core.exceptions import FieldDoesNotExist
-from django.db.models.fields import related, CharField, Field
-from django.db.models.options import IMMUTABLE_WARNING, EMPTY_RELATION_TREE
+from django.db.models.fields import CharField, Field, related
+from django.db.models.options import EMPTY_RELATION_TREE, IMMUTABLE_WARNING
 from django.test import TestCase
 
-from .models import Relation, AbstractPerson, BasePerson, Person, ProxyPerson, Relating
+from .models import (
+    AbstractPerson, BasePerson, Child, CommonAncestor, FirstParent, Person,
+    ProxyPerson, Relating, Relation, SecondParent,
+)
 from .results import TEST_RESULTS
 
 
@@ -169,30 +174,24 @@ class GetFieldByNameTests(OptionsBaseTests):
         self.assertEqual(field_info[1:], (None, True, False))
         self.assertIsInstance(field_info[0], GenericRelation)
 
-    def test_get_fields_when_apps_not_ready(self):
+    def test_get_fields_only_searches_forward_on_apps_not_ready(self):
         opts = Person._meta
         # If apps registry is not ready, get_field() searches over only
         # forward fields.
-        opts.apps.ready = False
-        # Clear cached data.
-        opts.__dict__.pop('fields_map', None)
+        opts.apps.models_ready = False
         try:
             # 'data_abstract' is a forward field, and therefore will be found
             self.assertTrue(opts.get_field('data_abstract'))
             msg = (
-                "Person has no field named 'some_missing_field'. The app "
+                "Person has no field named 'relating_baseperson'. The app "
                 "cache isn't ready yet, so if this is an auto-created related "
-                "field, it might not be available yet."
+                "field, it won't be available yet."
             )
+            # 'data_abstract' is a reverse field, and will raise an exception
             with self.assertRaisesMessage(FieldDoesNotExist, msg):
-                opts.get_field('some_missing_field')
-            # Be sure it's not cached
-            self.assertNotIn('fields_map', opts.__dict__)
+                opts.get_field('relating_baseperson')
         finally:
-            opts.apps.ready = True
-        # At this point searching a related field would cache fields_map
-        opts.get_field('relating_baseperson')
-        self.assertIn('fields_map', opts.__dict__)
+            opts.apps.models_ready = True
 
 
 class RelationTreeTests(TestCase):
@@ -229,11 +228,9 @@ class RelationTreeTests(TestCase):
             sorted([field.related_query_name() for field in Relation._meta._relation_tree
                    if not field.rel.field.rel.is_hidden()]),
             sorted([
-                'fk_abstract_rel', 'fk_abstract_rel', 'fk_abstract_rel', 'fk_base_rel', 'fk_base_rel',
-                'fk_base_rel', 'fk_concrete_rel', 'fk_concrete_rel', 'fo_abstract_rel', 'fo_abstract_rel',
-                'fo_abstract_rel', 'fo_base_rel', 'fo_base_rel', 'fo_base_rel', 'fo_concrete_rel',
-                'fo_concrete_rel', 'm2m_abstract_rel', 'm2m_abstract_rel', 'm2m_abstract_rel',
-                'm2m_base_rel', 'm2m_base_rel', 'm2m_base_rel', 'm2m_concrete_rel', 'm2m_concrete_rel',
+                'fk_abstract_rel', 'fk_base_rel', 'fk_concrete_rel', 'fo_abstract_rel',
+                'fo_base_rel', 'fo_concrete_rel', 'm2m_abstract_rel',
+                'm2m_base_rel', 'm2m_concrete_rel'
             ])
         )
         # Testing hidden related objects
@@ -244,10 +241,17 @@ class RelationTreeTests(TestCase):
                 'BasePerson_following_base+', 'BasePerson_following_base+', 'BasePerson_friends_abstract+',
                 'BasePerson_friends_abstract+', 'BasePerson_friends_base+', 'BasePerson_friends_base+',
                 'BasePerson_m2m_abstract+', 'BasePerson_m2m_base+', 'Relating_basepeople+',
-                'Relating_basepeople_hidden+', 'followers_abstract', 'followers_abstract', 'followers_abstract',
-                'followers_base', 'followers_base', 'followers_base', 'friends_abstract_rel_+', 'friends_abstract_rel_+',
-                'friends_abstract_rel_+', 'friends_base_rel_+', 'friends_base_rel_+', 'friends_base_rel_+', 'person',
+                'Relating_basepeople_hidden+', 'followers_abstract',
+                'followers_base', 'friends_abstract_rel_+', 'friends_base_rel_+',
                 'person', 'relating_basepeople', 'relating_baseperson',
             ])
         )
         self.assertEqual([field.related_query_name() for field in AbstractPerson._meta._relation_tree], [])
+
+
+class ParentListTests(TestCase):
+    def test_get_parent_list(self):
+        self.assertEqual(CommonAncestor._meta.get_parent_list(), [])
+        self.assertEqual(FirstParent._meta.get_parent_list(), [CommonAncestor])
+        self.assertEqual(SecondParent._meta.get_parent_list(), [CommonAncestor])
+        self.assertEqual(Child._meta.get_parent_list(), [FirstParent, SecondParent, CommonAncestor])

@@ -13,9 +13,7 @@ from django.apps import apps
 from django.core.exceptions import FieldDoesNotExist
 from django.db.backends import utils
 from django.db.models.constants import LOOKUP_SEP
-from django.utils import six
-from django.utils import tree
-
+from django.utils import six, tree
 
 # PathInfo is used when converting lookups (fk__somecol). The contents
 # describe the relation in Model terms (model Options and Fields for both
@@ -35,6 +33,8 @@ class QueryWrapper(object):
     A type that indicates the contents are an SQL fragment and the associate
     parameters. Can be used to pass opaque data to a where-clause, for example.
     """
+    contains_aggregate = False
+
     def __init__(self, sql, params):
         self.data = sql, list(params)
 

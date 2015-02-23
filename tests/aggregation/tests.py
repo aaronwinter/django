@@ -1,22 +1,21 @@
 from __future__ import unicode_literals
 
 import datetime
-from decimal import Decimal
 import re
+from decimal import Decimal
 
 from django.core.exceptions import FieldError
 from django.db import connection
 from django.db.models import (
-    Avg, Sum, Count, Max, Min,
-    Aggregate, F, Value, Func,
-    IntegerField, FloatField, DecimalField)
+    F, Aggregate, Avg, Count, DecimalField, FloatField, Func, IntegerField,
+    Max, Min, Sum, Value,
+)
 from django.test import TestCase, ignore_warnings
-from django.test.utils import Approximate
-from django.test.utils import CaptureQueriesContext
+from django.test.utils import Approximate, CaptureQueriesContext
 from django.utils import six, timezone
 from django.utils.deprecation import RemovedInDjango20Warning
 
-from .models import Author, Publisher, Book, Store
+from .models import Author, Book, Publisher, Store
 
 
 class BaseAggregateTestCase(TestCase):
@@ -711,10 +710,12 @@ class ComplexAggregateTestCase(TestCase):
         self.assertEqual(book.val, 2)
         book = Book.objects.annotate(val=Max(Value(2), output_field=IntegerField()))[0]
         self.assertEqual(book.val, 2)
+        book = Book.objects.annotate(val=Max(2, output_field=IntegerField()))[0]
+        self.assertEqual(book.val, 2)
 
     def test_missing_output_field_raises_error(self):
         with six.assertRaisesRegex(self, FieldError, 'Cannot resolve expression type, unknown output_field'):
-            Book.objects.annotate(val=Max(Value(2)))[0]
+            Book.objects.annotate(val=Max(2))[0]
 
     def test_annotation_expressions(self):
         authors = Author.objects.annotate(combined_ages=Sum(F('age') + F('friends__age'))).order_by('name')
@@ -773,7 +774,7 @@ class ComplexAggregateTestCase(TestCase):
         with six.assertRaisesRegex(self, TypeError, 'Complex aggregates require an alias'):
             Author.objects.aggregate(Sum('age') / Count('age'))
         with six.assertRaisesRegex(self, TypeError, 'Complex aggregates require an alias'):
-            Author.objects.aggregate(Sum(Value(1)))
+            Author.objects.aggregate(Sum(1))
 
     def test_aggregate_over_complex_annotation(self):
         qs = Author.objects.annotate(

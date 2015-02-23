@@ -8,18 +8,18 @@ import time
 from email.header import Header
 
 from django.conf import settings
-from django.core import signals
-from django.core import signing
+from django.core import signals, signing
 from django.core.exceptions import DisallowedRedirect
 from django.core.serializers.json import DjangoJSONEncoder
 from django.http.cookie import SimpleCookie
 from django.utils import six, timezone
-from django.utils.encoding import force_bytes, force_text, force_str, iri_to_uri
+from django.utils.encoding import (
+    force_bytes, force_str, force_text, iri_to_uri,
+)
 from django.utils.http import cookie_date
 from django.utils.six.moves import map
 from django.utils.six.moves.http_client import responses
 from django.utils.six.moves.urllib.parse import urlparse
-
 
 _charset_from_content_type_re = re.compile(r';\s*charset=(?P<charset>[^\s;]+)', re.I)
 
@@ -102,6 +102,9 @@ class HttpResponseBase(six.Iterator):
         """
         if not isinstance(value, (bytes, six.text_type)):
             value = str(value)
+        if ((isinstance(value, bytes) and (b'\n' in value or b'\r' in value)) or
+                isinstance(value, six.text_type) and ('\n' in value or '\r' in value)):
+            raise BadHeaderError("Header values can't contain newlines (got %r)" % value)
         try:
             if six.PY3:
                 if isinstance(value, str):
@@ -124,8 +127,6 @@ class HttpResponseBase(six.Iterator):
             else:
                 e.reason += ', HTTP response headers must be in %s format' % charset
                 raise
-        if str('\n') in value or str('\r') in value:
-            raise BadHeaderError("Header values can't contain newlines (got %r)" % value)
         return value
 
     def __setitem__(self, header, value):
@@ -217,10 +218,6 @@ class HttpResponseBase(six.Iterator):
         # Per PEP 3333, this response body must be bytes. To avoid returning
         # an instance of a subclass, this function returns `bytes(value)`.
         # This doesn't make a copy when `value` already contains bytes.
-
-        # If content is already encoded (eg. gzip), assume bytes.
-        if self.has_header('Content-Encoding'):
-            return bytes(value)
 
         # Handle string types -- we can't rely on force_bytes here because:
         # - under Python 3 it attempts str conversion first

@@ -618,10 +618,6 @@ and with other ``F()`` objects. To find all the blog entries with more than
 
     >>> Entry.objects.filter(n_comments__gt=F('n_pingbacks') * 2)
 
-.. versionadded:: 1.7
-
-    The power operator ``**`` was added.
-
 To find all the entries where the rating of the entry is less than the
 sum of the pingback count and comment count, we would issue the
 query::
@@ -1149,8 +1145,6 @@ above example code would look like this::
 Using a custom reverse manager
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. versionadded:: 1.7
-
 By default the :class:`~django.db.models.fields.related.RelatedManager` used
 for reverse relations is a subclass of the :ref:`default manager <manager-names>`
 for that model. If you would like to specify a different manager for a given
@@ -1195,6 +1189,9 @@ be found in the :doc:`related objects reference </ref/models/relations>`.
 
 ``clear()``
     Removes all objects from the related object set.
+
+``set(objs)``
+    Replace the set of related objects.
 
 To assign the members of a related set in one fell swoop, just assign to it
 from any iterable object. The iterable can contain object instances, or just

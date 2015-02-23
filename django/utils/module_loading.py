@@ -1,9 +1,7 @@
-from __future__ import absolute_import  # Avoid importing `importlib` from this package.
-
 import copy
-from importlib import import_module
 import os
 import sys
+from importlib import import_module
 
 from django.utils import six
 

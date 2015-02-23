@@ -4,6 +4,7 @@ to load templates from them in order, caching the result.
 """
 
 import hashlib
+
 from django.template.base import Template, TemplateDoesNotExist
 from django.utils.encoding import force_bytes
 
@@ -11,7 +12,6 @@ from .base import Loader as BaseLoader
 
 
 class Loader(BaseLoader):
-    is_usable = True
 
     def __init__(self, engine, loaders):
         self.template_cache = {}

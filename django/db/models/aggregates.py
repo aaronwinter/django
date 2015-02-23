@@ -3,7 +3,7 @@ Classes to represent the definitions of aggregate functions.
 """
 from django.core.exceptions import FieldError
 from django.db.models.expressions import Func, Value
-from django.db.models.fields import IntegerField, FloatField
+from django.db.models.fields import FloatField, IntegerField
 
 __all__ = [
     'Aggregate', 'Avg', 'Count', 'Max', 'Min', 'StdDev', 'Sum', 'Variance',
@@ -77,7 +77,7 @@ class Avg(Aggregate):
     def __init__(self, expression, **extra):
         super(Avg, self).__init__(expression, output_field=FloatField(), **extra)
 
-    def convert_value(self, value, connection, context):
+    def convert_value(self, value, expression, connection, context):
         if value is None:
             return value
         return float(value)
@@ -101,7 +101,7 @@ class Count(Aggregate):
             'False' if self.extra['distinct'] == '' else 'True',
         )
 
-    def convert_value(self, value, connection, context):
+    def convert_value(self, value, expression, connection, context):
         if value is None:
             return 0
         return int(value)
@@ -131,7 +131,7 @@ class StdDev(Aggregate):
             'False' if self.function == 'STDDEV_POP' else 'True',
         )
 
-    def convert_value(self, value, connection, context):
+    def convert_value(self, value, expression, connection, context):
         if value is None:
             return value
         return float(value)
@@ -156,7 +156,7 @@ class Variance(Aggregate):
             'False' if self.function == 'VAR_POP' else 'True',
         )
 
-    def convert_value(self, value, connection, context):
+    def convert_value(self, value, expression, connection, context):
         if value is None:
             return value
         return float(value)

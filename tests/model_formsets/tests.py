@@ -8,16 +8,20 @@ from decimal import Decimal
 from django import forms
 from django.core.exceptions import ImproperlyConfigured
 from django.db import models
-from django.forms.models import (_get_foreign_key, inlineformset_factory,
-    modelformset_factory, BaseModelFormSet)
+from django.forms.models import (
+    BaseModelFormSet, _get_foreign_key, inlineformset_factory,
+    modelformset_factory,
+)
 from django.test import TestCase, skipUnlessDBFeature
 from django.utils import six
 
-from .models import (Author, BetterAuthor, Book, BookWithCustomPK,
-    BookWithOptionalAltEditor, AlternateBook, AuthorMeeting, CustomPrimaryKey,
-    Place, Owner, Location, OwnerProfile, Restaurant, Product, Price,
-    MexicanRestaurant, ClassyMexicanRestaurant, Repository, Revision,
-    Person, Membership, Team, Player, Poet, Poem, Post)
+from .models import (
+    AlternateBook, Author, AuthorMeeting, BetterAuthor, Book, BookWithCustomPK,
+    BookWithOptionalAltEditor, ClassyMexicanRestaurant, CustomPrimaryKey,
+    Location, Membership, MexicanRestaurant, Owner, OwnerProfile, Person,
+    Place, Player, Poem, Poet, Post, Price, Product, Repository, Restaurant,
+    Revision, Team,
+)
 
 
 class DeletionTests(TestCase):
@@ -1427,3 +1431,21 @@ class TestModelFormsetOverridesTroughFormMeta(TestCase):
         form = BookFormSet.form(data={'title': 'Foo ' * 30, 'author': author.id})
         form.full_clean()
         self.assertEqual(form.errors, {'title': ['Title too long!!']})
+
+    def test_modelformset_factory_field_class_overrides(self):
+        author = Author.objects.create(pk=1, name='Charles Baudelaire')
+        BookFormSet = modelformset_factory(Book, fields="__all__", field_classes={
+            'title': forms.SlugField,
+        })
+        form = BookFormSet.form(data={'title': 'Foo ' * 30, 'author': author.id})
+        self.assertIs(Book._meta.get_field('title').__class__, models.CharField)
+        self.assertIsInstance(form.fields['title'], forms.SlugField)
+
+    def test_inlineformset_factory_field_class_overrides(self):
+        author = Author.objects.create(pk=1, name='Charles Baudelaire')
+        BookFormSet = inlineformset_factory(Author, Book, fields="__all__", field_classes={
+            'title': forms.SlugField,
+        })
+        form = BookFormSet.form(data={'title': 'Foo ' * 30, 'author': author.id})
+        self.assertIs(Book._meta.get_field('title').__class__, models.CharField)
+        self.assertIsInstance(form.fields['title'], forms.SlugField)

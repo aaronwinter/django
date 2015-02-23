@@ -2,8 +2,6 @@
 System check framework
 ======================
 
-.. versionadded:: 1.7
-
 The system check framework is a set of static checks for validating Django
 projects. It detects common problems and provides hints for how to fix them.
 The framework is extensible so you can easily add your own checks.
@@ -184,7 +182,7 @@ that might occur as a result of a version upgrade.
   ``django.contrib.auth.middleware.AuthenticationMiddleware``, and
   ``django.contrib.messages.middleware.MessageMiddleware`` were removed from
   the defaults. If your project needs these middleware then you should
-  configure this setting.
+  configure this setting. *This check was removed in Django 1.9*.
 
 Admin
 -----

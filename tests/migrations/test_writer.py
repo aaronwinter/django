@@ -8,20 +8,23 @@ import re
 import tokenize
 import unittest
 
-from django.core.validators import RegexValidator, EmailValidator
-from django.db import models, migrations
-from django.db.migrations.writer import MigrationWriter, OperationWriter, SettingsReference
-from django.test import SimpleTestCase, TestCase, ignore_warnings
-from django.conf import settings
-from django.utils import datetime_safe, six
-from django.utils.deconstruct import deconstructible
-from django.utils.translation import ugettext_lazy as _
-from django.utils.timezone import get_default_timezone, utc, FixedOffset
-
-import custom_migration_operations.operations
 import custom_migration_operations.more_operations
+import custom_migration_operations.operations
 
-from .models import FoodQuerySet, FoodManager
+from django.conf import settings
+from django.core.validators import EmailValidator, RegexValidator
+from django.db import migrations, models
+from django.db.migrations.writer import (
+    MigrationWriter, OperationWriter, SettingsReference,
+)
+from django.test import SimpleTestCase, TestCase, ignore_warnings
+from django.utils import datetime_safe, six
+from django.utils._os import upath
+from django.utils.deconstruct import deconstructible
+from django.utils.timezone import FixedOffset, get_default_timezone, utc
+from django.utils.translation import ugettext_lazy as _
+
+from .models import FoodManager, FoodQuerySet
 
 
 class TestModel1(object):
@@ -399,7 +402,7 @@ class WriterTests(TestCase):
             'migrations.migrations_test_apps.without_init_file',
         ]
 
-        base_dir = os.path.dirname(os.path.dirname(__file__))
+        base_dir = os.path.dirname(os.path.dirname(upath(__file__)))
 
         for app in test_apps:
             with self.modify_settings(INSTALLED_APPS={'append': app}):

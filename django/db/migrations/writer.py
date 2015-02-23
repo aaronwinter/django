@@ -3,23 +3,23 @@ from __future__ import unicode_literals
 import collections
 import datetime
 import decimal
-from importlib import import_module
 import inspect
 import math
 import os
 import re
 import sys
 import types
+from importlib import import_module
 
 from django.apps import apps
-from django.db import models, migrations
+from django.db import migrations, models
 from django.db.migrations.loader import MigrationLoader
 from django.utils import datetime_safe, six
+from django.utils._os import upath
 from django.utils.encoding import force_text
 from django.utils.functional import Promise
 from django.utils.timezone import utc
 from django.utils.version import get_docs_version
-
 
 COMPILED_REGEX_TYPE = type(re.compile(''))
 
@@ -216,7 +216,7 @@ class MigrationWriter(object):
             if not hasattr(migrations_module, '__file__'):
                 raise ImportError
 
-            basedir = os.path.dirname(migrations_module.__file__)
+            basedir = os.path.dirname(upath(migrations_module.__file__))
         except ImportError:
             app_config = apps.get_app_config(self.migration.app_label)
             migrations_package_basename = migrations_package_name.split(".")[-1]
@@ -228,11 +228,11 @@ class MigrationWriter(object):
                 # In case of using MIGRATION_MODULES setting and the custom
                 # package doesn't exist, create one.
                 package_dirs = migrations_package_name.split(".")
-                create_path = os.path.join(sys.path[0], *package_dirs)
+                create_path = os.path.join(upath(sys.path[0]), *package_dirs)
                 if not os.path.isdir(create_path):
                     os.makedirs(create_path)
                 for i in range(1, len(package_dirs) + 1):
-                    init_dir = os.path.join(sys.path[0], *package_dirs[:i])
+                    init_dir = os.path.join(upath(sys.path[0]), *package_dirs[:i])
                     init_path = os.path.join(init_dir, "__init__.py")
                     if not os.path.isfile(init_path):
                         open(init_path, "w").close()

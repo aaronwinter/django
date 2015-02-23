@@ -17,10 +17,6 @@ Django supports addition, subtraction, multiplication, division, modulo
 arithmetic, and the power operator on query expressions, using Python constants,
 variables, and even other expressions.
 
-.. versionadded:: 1.7
-
-    Support for the power operator ``**`` was added.
-
 Some examples
 =============
 
@@ -221,6 +217,10 @@ function will be applied to. The expressions will be converted to strings,
 joined together with ``arg_joiner``, and then interpolated into the ``template``
 as the ``expressions`` placeholder.
 
+Positional arguments can be expressions or Python values. Strings are
+assumed to be column references and will be wrapped in ``F()`` expressions
+while other values will be wrapped in ``Value()`` expressions.
+
 The ``**extra`` kwargs are ``key=value`` pairs that can be interpolated
 into the ``template`` attribute. Note that the keywords ``function`` and
 ``template`` can be used to replace the ``function`` and ``template``
@@ -412,7 +412,7 @@ calling the appropriate methods on the wrapped expression.
               clone.expression = self.expression.relabeled_clone(change_map)
               return clone
 
-    .. method:: convert_value(self, value, connection, context)
+    .. method:: convert_value(self, value, expression, connection, context)
 
         A hook allowing the expression to coerce ``value`` into a more
         appropriate type.

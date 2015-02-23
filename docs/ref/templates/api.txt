@@ -442,8 +442,6 @@ If you ``pop()`` too much, it'll raise
     ...
     ContextPopException
 
-.. versionadded:: 1.7
-
 You can also use ``push()`` as a context manager to ensure a matching ``pop()``
 is called.
 
@@ -489,8 +487,6 @@ Using a ``Context`` as a stack comes in handy in :ref:`some custom template
 tags <howto-writing-custom-template-tags>`.
 
 .. method:: Context.flatten()
-
-.. versionadded:: 1.7
 
 Using ``flatten()`` method you can get whole ``Context`` stack as one dictionary
 including builtin variables.
@@ -705,10 +701,6 @@ variables:
 * ``DEFAULT_MESSAGE_LEVELS`` -- A mapping of the message level names to
   :ref:`their numeric value <message-level-constants>`.
 
-.. versionchanged:: 1.7
-
-       The ``DEFAULT_MESSAGE_LEVELS`` variable was added.
-
 Writing your own context processors
 -----------------------------------
 
@@ -810,7 +802,7 @@ loaders that come with Django:
 
     For example, for this setting::
 
-        INSTALLED_APPS = ('myproject.polls', 'myproject.music')
+        INSTALLED_APPS = ['myproject.polls', 'myproject.music']
 
     ...then ``get_template('foo.html')`` will look for ``foo.html`` in these
     directories, in this order:
@@ -941,12 +933,10 @@ the template source, and returns a tuple: ``(template, template_origin)``.
 Template origin
 ===============
 
-.. versionadded:: 1.7
-
 When an :class:`~django.template.Engine` is initialized with ``debug=True``,
 its templates have an ``origin`` attribute depending on the source they are
 loaded from. For engines initialized by Django, ``debug`` defaults to the
-value of :setting:`TEMPLATE_DEBUG`.
+value of :setting:`DEBUG`.
 
 .. class:: loader.LoaderOrigin
 

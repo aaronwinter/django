@@ -1,19 +1,20 @@
 from functools import update_wrapper
-from django.http import Http404, HttpResponseRedirect
+
+from django.apps import apps
+from django.conf import settings
 from django.contrib.admin import ModelAdmin, actions
 from django.contrib.auth import REDIRECT_FIELD_NAME
-from django.views.decorators.csrf import csrf_protect
-from django.db.models.base import ModelBase
-from django.apps import apps
 from django.core.exceptions import ImproperlyConfigured, PermissionDenied
-from django.core.urlresolvers import reverse, NoReverseMatch
+from django.core.urlresolvers import NoReverseMatch, reverse
+from django.db.models.base import ModelBase
+from django.http import Http404, HttpResponseRedirect
 from django.template.engine import Engine
 from django.template.response import TemplateResponse
 from django.utils import six
 from django.utils.text import capfirst
-from django.utils.translation import ugettext_lazy, ugettext as _
+from django.utils.translation import ugettext as _, ugettext_lazy
 from django.views.decorators.cache import never_cache
-from django.conf import settings
+from django.views.decorators.csrf import csrf_protect
 
 system_check_errors = []
 
@@ -177,8 +178,14 @@ class AdminSite(object):
                 "setting in order to use the admin application.")
         try:
             default_template_engine = Engine.get_default()
-        except ImproperlyConfigured:
-            # Skip the check if the user has a non-trivial TEMPLATES setting
+        except Exception:
+            # Skip this non-critical check:
+            # 1. if the user has a non-trivial TEMPLATES setting and Django
+            #    can't find a default template engine
+            # 2. if anything goes wrong while loading template engines, in
+            #    order to avoid raising an exception from a confusing location
+            # Catching ImproperlyConfigured suffices for 1. but 2. requires
+            # catching all exceptions.
             pass
         else:
             if ('django.contrib.auth.context_processors.auth'

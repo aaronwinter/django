@@ -4,21 +4,20 @@ from __future__ import unicode_literals
 import logging
 import warnings
 
+from admin_scripts.tests import AdminScriptTestCase
+
 from django.core import mail
 from django.core.files.temp import NamedTemporaryFile
-from django.test import TestCase, RequestFactory, override_settings
+from django.test import RequestFactory, TestCase, override_settings
 from django.test.utils import patch_logger
-from django.utils.encoding import force_text
 from django.utils.deprecation import RemovedInNextVersionWarning
+from django.utils.encoding import force_text
 from django.utils.log import (
     AdminEmailHandler, CallbackFilter, RequireDebugFalse, RequireDebugTrue,
 )
 from django.utils.six import StringIO
 
-from admin_scripts.tests import AdminScriptTestCase
-
 from .logconfig import MyEmailBackend
-
 
 # logging config prior to using filter with mail_admins
 OLD_LOGGING = {
@@ -185,7 +184,7 @@ class AdminEmailHandlerTest(TestCase):
         self.assertTrue(admin_email_handler.connection().fail_silently)
 
     @override_settings(
-        ADMINS=(('whatever admin', 'admin@example.com'),),
+        ADMINS=[('whatever admin', 'admin@example.com')],
         EMAIL_SUBJECT_PREFIX='-SuperAwesomeSubject-'
     )
     def test_accepts_args(self):
@@ -215,9 +214,9 @@ class AdminEmailHandlerTest(TestCase):
             admin_email_handler.filters = orig_filters
 
     @override_settings(
-        ADMINS=(('whatever admin', 'admin@example.com'),),
+        ADMINS=[('whatever admin', 'admin@example.com')],
         EMAIL_SUBJECT_PREFIX='-SuperAwesomeSubject-',
-        INTERNAL_IPS=('127.0.0.1',),
+        INTERNAL_IPS=['127.0.0.1'],
     )
     def test_accepts_args_and_request(self):
         """
@@ -250,7 +249,7 @@ class AdminEmailHandlerTest(TestCase):
             admin_email_handler.filters = orig_filters
 
     @override_settings(
-        ADMINS=(('admin', 'admin@example.com'),),
+        ADMINS=[('admin', 'admin@example.com')],
         EMAIL_SUBJECT_PREFIX='',
         DEBUG=False,
     )
@@ -295,7 +294,7 @@ class AdminEmailHandlerTest(TestCase):
         self.assertEqual(mail.outbox[0].subject, expected_subject)
 
     @override_settings(
-        ADMINS=(('admin', 'admin@example.com'),),
+        ADMINS=[('admin', 'admin@example.com')],
         DEBUG=False,
     )
     def test_uses_custom_email_backend(self):
@@ -327,7 +326,7 @@ class AdminEmailHandlerTest(TestCase):
             admin_email_handler.email_backend = orig_email_backend
 
     @override_settings(
-        ADMINS=(('whatever admin', 'admin@example.com'),),
+        ADMINS=[('whatever admin', 'admin@example.com')],
     )
     def test_emit_non_ascii(self):
         """
@@ -347,7 +346,7 @@ class AdminEmailHandlerTest(TestCase):
         self.assertIn("path:%s" % url_path, msg.body)
 
     @override_settings(
-        MANAGERS=(('manager', 'manager@example.com'),),
+        MANAGERS=[('manager', 'manager@example.com')],
         DEBUG=False,
     )
     def test_customize_send_mail_method(self):
@@ -423,7 +422,7 @@ class SecurityLoggerTest(TestCase):
             self.assertEqual(calls[0], 'dubious')
 
     @override_settings(
-        ADMINS=(('admin', 'admin@example.com'),),
+        ADMINS=[('admin', 'admin@example.com')],
         DEBUG=False,
     )
     def test_suspicious_email_admins(self):

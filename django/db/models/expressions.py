@@ -6,8 +6,8 @@ from django.core.exceptions import FieldError
 from django.db.backends import utils as backend_utils
 from django.db.models import fields
 from django.db.models.constants import LOOKUP_SEP
-from django.db.models.query_utils import refs_aggregate, Q
-from django.utils import timezone
+from django.db.models.query_utils import Q, refs_aggregate
+from django.utils import six, timezone
 from django.utils.functional import cached_property
 
 
@@ -138,6 +138,13 @@ class BaseExpression(object):
     def set_source_expressions(self, exprs):
         assert len(exprs) == 0
 
+    def _parse_expressions(self, *expressions):
+        return [
+            arg if hasattr(arg, 'resolve_expression') else (
+                F(arg) if isinstance(arg, six.string_types) else Value(arg)
+            ) for arg in expressions
+        ]
+
     def as_sql(self, compiler, connection):
         """
         Responsible for returning a (sql, [params]) tuple to be included
@@ -245,7 +252,7 @@ class BaseExpression(object):
                         raise FieldError(
                             "Expression contains mixed types. You must set output_field")
 
-    def convert_value(self, value, connection, context):
+    def convert_value(self, value, expression, connection, context):
         """
         Expressions provide their own converters because users have the option
         of manually specifying the output_field which may be a different type
@@ -466,12 +473,6 @@ class Func(ExpressionNode):
     def set_source_expressions(self, exprs):
         self.source_expressions = exprs
 
-    def _parse_expressions(self, *expressions):
-        return [
-            arg if hasattr(arg, 'resolve_expression') else F(arg)
-            for arg in expressions
-        ]
-
     def resolve_expression(self, query=None, allow_joins=True, reuse=None, summarize=False, for_save=False):
         c = self.copy()
         c.is_summary = summarize
@@ -584,10 +585,10 @@ class Random(ExpressionNode):
 
 
 class Col(ExpressionNode):
-    def __init__(self, alias, target, source=None):
-        if source is None:
-            source = target
-        super(Col, self).__init__(output_field=source)
+    def __init__(self, alias, target, output_field=None):
+        if output_field is None:
+            output_field = target
+        super(Col, self).__init__(output_field=output_field)
         self.alias, self.target = alias, target
 
     def __repr__(self):
@@ -605,7 +606,10 @@ class Col(ExpressionNode):
         return [self]
 
     def get_db_converters(self, connection):
-        return self.output_field.get_db_converters(connection)
+        if self.target == self.output_field:
+            return self.output_field.get_db_converters(connection)
+        return (self.output_field.get_db_converters(connection) +
+                self.target.get_db_converters(connection))
 
 
 class Ref(ExpressionNode):
@@ -639,14 +643,14 @@ class Ref(ExpressionNode):
 class When(ExpressionNode):
     template = 'WHEN %(condition)s THEN %(result)s'
 
-    def __init__(self, condition=None, then=Value(None), **lookups):
+    def __init__(self, condition=None, then=None, **lookups):
         if lookups and condition is None:
             condition, lookups = Q(**lookups), None
         if condition is None or not isinstance(condition, Q) or lookups:
             raise TypeError("__init__() takes either a Q object or lookups as keyword arguments")
         super(When, self).__init__(output_field=None)
         self.condition = condition
-        self.result = self._parse_expression(then)
+        self.result = self._parse_expressions(then)[0]
 
     def __str__(self):
         return "WHEN %r THEN %r" % (self.condition, self.result)
@@ -663,9 +667,6 @@ class When(ExpressionNode):
     def get_source_fields(self):
         # We're only interested in the fields of the result expressions.
         return [self.result._output_field_or_none]
-
-    def _parse_expression(self, expression):
-        return expression if hasattr(expression, 'resolve_expression') else F(expression)
 
     def resolve_expression(self, query=None, allow_joins=True, reuse=None, summarize=False, for_save=False):
         c = self.copy()
@@ -713,11 +714,11 @@ class Case(ExpressionNode):
     def __init__(self, *cases, **extra):
         if not all(isinstance(case, When) for case in cases):
             raise TypeError("Positional arguments must all be When objects.")
-        default = extra.pop('default', Value(None))
+        default = extra.pop('default', None)
         output_field = extra.pop('output_field', None)
         super(Case, self).__init__(output_field)
         self.cases = list(cases)
-        self.default = default if hasattr(default, 'resolve_expression') else F(default)
+        self.default = self._parse_expressions(default)[0]
 
     def __str__(self):
         return "CASE %s, ELSE %r" % (', '.join(str(c) for c in self.cases), self.default)
@@ -803,7 +804,7 @@ class Date(ExpressionNode):
         copy.lookup_type = self.lookup_type
         return copy
 
-    def convert_value(self, value, connection, context):
+    def convert_value(self, value, expression, connection, context):
         if isinstance(value, datetime.datetime):
             value = value.date()
         return value
@@ -855,7 +856,7 @@ class DateTime(ExpressionNode):
         copy.tzname = self.tzname
         return copy
 
-    def convert_value(self, value, connection, context):
+    def convert_value(self, value, expression, connection, context):
         if settings.USE_TZ:
             if value is None:
                 raise ValueError(

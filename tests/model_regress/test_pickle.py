@@ -5,8 +5,8 @@ import subprocess
 import sys
 import warnings
 
-from django.db import models, DJANGO_VERSION_PICKLE_KEY
 from django.core.files.temp import NamedTemporaryFile
+from django.db import DJANGO_VERSION_PICKLE_KEY, models
 from django.test import TestCase
 from django.utils.encoding import force_text
 from django.utils.version import get_major_version, get_version
@@ -71,7 +71,7 @@ from django.conf import settings
 
 data = %r
 
-settings.configure(DEBUG=False, INSTALLED_APPS=('model_regress',), SECRET_KEY = "blah")
+settings.configure(DEBUG=False, INSTALLED_APPS=['model_regress'], SECRET_KEY = "blah")
 article = pickle.loads(data)
 print(article.headline)"""
         a = Article.objects.create(
@@ -88,6 +88,7 @@ print(article.headline)"""
                 str('PYTHONPATH'): os.pathsep.join(sys.path),
                 # Needed on Windows because http://bugs.python.org/issue8557
                 str('PATH'): os.environ['PATH'],
+                str('LANG'): os.environ.get('LANG', ''),
             }
             if 'SYSTEMROOT' in os.environ:  # Windows http://bugs.python.org/issue20614
                 env[str('SYSTEMROOT')] = os.environ['SYSTEMROOT']

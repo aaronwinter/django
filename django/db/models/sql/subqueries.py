@@ -9,7 +9,6 @@ from django.db.models.sql.constants import GET_ITERATOR_CHUNK_SIZE, NO_RESULTS
 from django.db.models.sql.query import Query
 from django.utils import six
 
-
 __all__ = ['DeleteQuery', 'UpdateQuery', 'InsertQuery', 'AggregateQuery']
 
 
@@ -54,10 +53,8 @@ class DeleteQuery(Query):
         self.get_initial_alias()
         innerq_used_tables = [t for t in innerq.tables
                               if innerq.alias_refcount[t]]
-        if ((not innerq_used_tables or innerq_used_tables == self.tables)
-                and not len(innerq.having)):
-            # There is only the base table in use in the query, and there is
-            # no aggregate filtering going on.
+        if not innerq_used_tables or innerq_used_tables == self.tables:
+            # There is only the base table in use in the query.
             self.where = innerq.where
         else:
             pk = query.model._meta.pk

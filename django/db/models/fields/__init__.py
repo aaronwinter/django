@@ -330,12 +330,12 @@ class Field(RegisterLookupMixin):
             ]
         return []
 
-    def get_col(self, alias, source=None):
-        if source is None:
-            source = self
-        if alias != self.model._meta.db_table or source != self:
+    def get_col(self, alias, output_field=None):
+        if output_field is None:
+            output_field = self
+        if alias != self.model._meta.db_table or output_field != self:
             from django.db.models.expressions import Col
-            return Col(alias, self, source)
+            return Col(alias, self, output_field)
         else:
             return self.cached_col
 
@@ -502,6 +502,17 @@ class Field(RegisterLookupMixin):
             raise RuntimeError("Fields of deferred models can't be reduced")
         return _load_field, (self.model._meta.app_label, self.model._meta.object_name,
                              self.name)
+
+    def get_pk_value_on_save(self, instance):
+        """
+        Hook to generate new PK values on save. This method is called when
+        saving instances with no primary key value set. If this method returns
+        something else than None, then the returned value is used when saving
+        the new instance.
+        """
+        if self.default:
+            return self.get_default()
+        return None
 
     def to_python(self, value):
         """
@@ -1678,6 +1689,13 @@ class DurationField(Field):
         val = self._get_val_from_obj(obj)
         return '' if val is None else duration_string(val)
 
+    def formfield(self, **kwargs):
+        defaults = {
+            'form_class': forms.DurationField,
+        }
+        defaults.update(kwargs)
+        return super(DurationField, self).formfield(**defaults)
+
 
 class EmailField(CharField):
     default_validators = [validators.validate_email]
@@ -2351,20 +2369,25 @@ class UUIDField(Field):
     description = 'Universally unique identifier'
     empty_strings_allowed = False
 
-    def __init__(self, **kwargs):
+    def __init__(self, verbose_name=None, **kwargs):
         kwargs['max_length'] = 32
-        super(UUIDField, self).__init__(**kwargs)
+        super(UUIDField, self).__init__(verbose_name, **kwargs)
+
+    def deconstruct(self):
+        name, path, args, kwargs = super(UUIDField, self).deconstruct()
+        del kwargs['max_length']
+        return name, path, args, kwargs
 
     def get_internal_type(self):
         return "UUIDField"
 
     def get_db_prep_value(self, value, connection, prepared=False):
+        if isinstance(value, six.string_types):
+            value = uuid.UUID(value.replace('-', ''))
         if isinstance(value, uuid.UUID):
             if connection.features.has_native_uuid_field:
                 return value
             return value.hex
-        if isinstance(value, six.string_types):
-            return value.replace('-', '')
         return value
 
     def to_python(self, value):

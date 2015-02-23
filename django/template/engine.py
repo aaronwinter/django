@@ -1,15 +1,13 @@
 import warnings
 
 from django.core.exceptions import ImproperlyConfigured
-from django.utils import lru_cache
-from django.utils import six
+from django.utils import lru_cache, six
 from django.utils.deprecation import RemovedInDjango20Warning
 from django.utils.functional import cached_property
 from django.utils.module_loading import import_string
 
 from .base import Context, Lexer, Parser, Template, TemplateDoesNotExist
 from .context import _builtin_context_processors
-
 
 _context_instance_undefined = object()
 _dictionary_undefined = object()
@@ -121,18 +119,7 @@ class Engine(object):
                     "instead of django.template.loaders.base.Loader. " %
                     loader, RemovedInDjango20Warning, stacklevel=2)
 
-            loader_instance = loader_class(*args)
-
-            if not loader_instance.is_usable:
-                warnings.warn(
-                    "Your template loaders configuration includes %r, but "
-                    "your Python installation doesn't support that type of "
-                    "template loading. Consider removing that line from "
-                    "your settings." % loader)
-                return None
-            else:
-                return loader_instance
-
+            return loader_class(*args)
         else:
             raise ImproperlyConfigured(
                 "Invalid value in template loaders configuration: %r" % loader)

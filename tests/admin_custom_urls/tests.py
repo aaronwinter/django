@@ -5,10 +5,10 @@ from django.core.urlresolvers import reverse
 from django.template.response import TemplateResponse
 from django.test import TestCase, override_settings
 
-from .models import Action, Person, Car
+from .models import Action, Car, Person
 
 
-@override_settings(PASSWORD_HASHERS=('django.contrib.auth.hashers.SHA1PasswordHasher',),
+@override_settings(PASSWORD_HASHERS=['django.contrib.auth.hashers.SHA1PasswordHasher'],
                    ROOT_URLCONF='admin_custom_urls.urls',)
 class AdminCustomUrlsTest(TestCase):
     """
@@ -26,7 +26,9 @@ class AdminCustomUrlsTest(TestCase):
         """
         Ensure GET on the add_view works.
         """
-        response = self.client.get('/admin/admin_custom_urls/action/!add/')
+        add_url = reverse('admin:admin_custom_urls_action_add')
+        self.assertTrue(add_url.endswith('/!add/'))
+        response = self.client.get(add_url)
         self.assertIsInstance(response, TemplateResponse)
         self.assertEqual(response.status_code, 200)
 
@@ -35,7 +37,7 @@ class AdminCustomUrlsTest(TestCase):
         Ensure GET on the add_view plus specifying a field value in the query
         string works.
         """
-        response = self.client.get('/admin/admin_custom_urls/action/!add/', {'name': 'My Action'})
+        response = self.client.get(reverse('admin:admin_custom_urls_action_add'), {'name': 'My Action'})
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'value="My Action"')
 
@@ -48,7 +50,7 @@ class AdminCustomUrlsTest(TestCase):
             "name": 'Action added through a popup',
             "description": "Description of added action",
         }
-        response = self.client.post('/admin/admin_custom_urls/action/!add/', post_data)
+        response = self.client.post(reverse('admin:admin_custom_urls_action_add'), post_data)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'dismissAddRelatedObjectPopup')
         self.assertContains(response, 'Action added through a popup')
@@ -59,11 +61,6 @@ class AdminCustomUrlsTest(TestCase):
         """
         # Should get the change_view for model instance with PK 'add', not show
         # the add_view
-        response = self.client.get('/admin/admin_custom_urls/action/add/')
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Change action')
-
-        # Ditto, but use reverse() to build the URL
         url = reverse('admin:%s_action_change' % Action._meta.app_label,
                 args=(quote('add'),))
         response = self.client.get(url)
@@ -80,7 +77,7 @@ class AdminCustomUrlsTest(TestCase):
         self.assertContains(response, 'value="path/to/html/document.html"')
 
 
-@override_settings(PASSWORD_HASHERS=('django.contrib.auth.hashers.SHA1PasswordHasher',),
+@override_settings(PASSWORD_HASHERS=['django.contrib.auth.hashers.SHA1PasswordHasher'],
                    ROOT_URLCONF='admin_custom_urls.urls',)
 class CustomRedirects(TestCase):
     fixtures = ['users.json', 'actions.json']

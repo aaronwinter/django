@@ -1,14 +1,14 @@
 from __future__ import unicode_literals
 
-import pickle
 import datetime
+import pickle
 import warnings
 
 from django.test import TestCase
 from django.utils.encoding import force_text
 from django.utils.version import get_major_version, get_version
 
-from .models import Group, Event, Happening, Container, M2MModel
+from .models import Container, Event, Group, Happening, M2MModel
 
 
 class PickleabilityTestCase(TestCase):
@@ -42,6 +42,9 @@ class PickleabilityTestCase(TestCase):
 
     def test_membermethod_as_default(self):
         self.assert_pickles(Happening.objects.filter(number4=1))
+
+    def test_filter_reverse_fk(self):
+        self.assert_pickles(Group.objects.filter(event=1))
 
     def test_doesnotexist_exception(self):
         # Ticket #17776

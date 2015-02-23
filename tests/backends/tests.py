@@ -4,26 +4,30 @@ from __future__ import unicode_literals
 
 import copy
 import datetime
-from decimal import Decimal, Rounded
 import re
 import threading
 import unittest
 import warnings
+from decimal import Decimal, Rounded
 
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.core.management.color import no_style
-from django.db import (connection, connections, DEFAULT_DB_ALIAS,
-    DatabaseError, IntegrityError, reset_queries, transaction)
+from django.db import (
+    DEFAULT_DB_ALIAS, DatabaseError, IntegrityError, connection, connections,
+    reset_queries, transaction,
+)
 from django.db.backends.base.base import BaseDatabaseWrapper
-from django.db.backends.signals import connection_created
 from django.db.backends.postgresql_psycopg2 import version as pg_version
-from django.db.backends.utils import format_number, CursorWrapper
-from django.db.models import Sum, Avg, Variance, StdDev
+from django.db.backends.signals import connection_created
+from django.db.backends.utils import CursorWrapper, format_number
+from django.db.models import Avg, StdDev, Sum, Variance
 from django.db.models.sql.constants import CURSOR
 from django.db.utils import ConnectionHandler
-from django.test import (TestCase, TransactionTestCase, mock, override_settings,
-    skipUnlessDBFeature, skipIfDBFeature)
+from django.test import (
+    TestCase, TransactionTestCase, mock, override_settings, skipIfDBFeature,
+    skipUnlessDBFeature,
+)
 from django.test.utils import str_prefix
 from django.utils import six
 from django.utils.six.moves import range
@@ -233,6 +237,34 @@ class PostgreSQLTests(TestCase):
         finally:
             new_connection.close()
 
+    def test_connect_isolation_level(self):
+        """
+        Regression test for #18130 and #24318.
+        """
+        from psycopg2.extensions import (
+            ISOLATION_LEVEL_READ_COMMITTED as read_committed,
+            ISOLATION_LEVEL_SERIALIZABLE as serializable,
+        )
+
+        # Since this is a django.test.TestCase, a transaction is in progress
+        # and the isolation level isn't reported as 0. This test assumes that
+        # PostgreSQL is configured with the default isolation level.
+
+        # Check the level on the psycopg2 connection, not the Django wrapper.
+        self.assertEqual(connection.connection.isolation_level, read_committed)
+
+        databases = copy.deepcopy(settings.DATABASES)
+        databases[DEFAULT_DB_ALIAS]['OPTIONS']['isolation_level'] = serializable
+        new_connections = ConnectionHandler(databases)
+        new_connection = new_connections[DEFAULT_DB_ALIAS]
+        try:
+            # Start a transaction so the isolation level isn't reported as 0.
+            new_connection.set_autocommit(False)
+            # Check the level on the psycopg2 connection, not the Django wrapper.
+            self.assertEqual(new_connection.connection.isolation_level, serializable)
+        finally:
+            new_connection.close()
+
     def _select(self, val):
         with connection.cursor() as cursor:
             cursor.execute("SELECT %s", (val,))
@@ -257,14 +289,14 @@ class PostgreSQLTests(TestCase):
             self.assertIn('::text', do.lookup_cast(lookup))
 
     def test_correct_extraction_psycopg2_version(self):
-        from django.db.backends.postgresql_psycopg2.base import DatabaseWrapper
+        from django.db.backends.postgresql_psycopg2.base import psycopg2_version
         version_path = 'django.db.backends.postgresql_psycopg2.base.Database.__version__'
 
         with mock.patch(version_path, '2.6.9'):
-            self.assertEqual(DatabaseWrapper.psycopg2_version.__get__(self), (2, 6, 9))
+            self.assertEqual(psycopg2_version(), (2, 6, 9))
 
         with mock.patch(version_path, '2.5.dev0'):
-            self.assertEqual(DatabaseWrapper.psycopg2_version.__get__(self), (2, 5))
+            self.assertEqual(psycopg2_version(), (2, 5))
 
 
 class DateQuotingTest(TestCase):
@@ -463,7 +495,7 @@ class EscapingChecks(TestCase):
     @unittest.skipUnless(connection.vendor == 'sqlite',
                          "This is an sqlite-specific issue")
     def test_sqlite_parameter_escaping(self):
-        #13648: '%s' escaping support for sqlite3
+        # '%s' escaping support for sqlite3 #13648
         cursor = connection.cursor()
         cursor.execute("select strftime('%s', date('now'))")
         response = cursor.fetchall()[0][0]
@@ -501,7 +533,7 @@ class BackendTestCase(TransactionTestCase):
             cursor.execute(query, args)
 
     def test_cursor_executemany(self):
-        #4896: Test cursor.executemany
+        # Test cursor.executemany #4896
         args = [(i, i ** 2) for i in range(-5, 6)]
         self.create_squares_with_executemany(args)
         self.assertEqual(models.Square.objects.count(), 11)
@@ -510,13 +542,13 @@ class BackendTestCase(TransactionTestCase):
             self.assertEqual(square.square, i ** 2)
 
     def test_cursor_executemany_with_empty_params_list(self):
-        #4765: executemany with params=[] does nothing
+        # Test executemany with params=[] does nothing #4765
         args = []
         self.create_squares_with_executemany(args)
         self.assertEqual(models.Square.objects.count(), 0)
 
     def test_cursor_executemany_with_iterator(self):
-        #10320: executemany accepts iterators
+        # Test executemany accepts iterators #10320
         args = iter((i, i ** 2) for i in range(-3, 2))
         self.create_squares_with_executemany(args)
         self.assertEqual(models.Square.objects.count(), 5)
@@ -529,14 +561,14 @@ class BackendTestCase(TransactionTestCase):
 
     @skipUnlessDBFeature('supports_paramstyle_pyformat')
     def test_cursor_execute_with_pyformat(self):
-        #10070: Support pyformat style passing of parameters
+        # Support pyformat style passing of parameters #10070
         args = {'root': 3, 'square': 9}
         self.create_squares(args, 'pyformat', multiple=False)
         self.assertEqual(models.Square.objects.count(), 1)
 
     @skipUnlessDBFeature('supports_paramstyle_pyformat')
     def test_cursor_executemany_with_pyformat(self):
-        #10070: Support pyformat style passing of parameters
+        # Support pyformat style passing of parameters #10070
         args = [{'root': i, 'square': i ** 2} for i in range(-5, 6)]
         self.create_squares(args, 'pyformat', multiple=True)
         self.assertEqual(models.Square.objects.count(), 11)
@@ -557,7 +589,7 @@ class BackendTestCase(TransactionTestCase):
         self.assertEqual(models.Square.objects.count(), 9)
 
     def test_unicode_fetches(self):
-        #6254: fetchone, fetchmany, fetchall return strings as unicode objects
+        # fetchone, fetchmany, fetchall return strings as unicode objects #6254
         qn = connection.ops.quote_name
         models.Person(first_name="John", last_name="Doe").save()
         models.Person(first_name="Jane", last_name="Doe").save()

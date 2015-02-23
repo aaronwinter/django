@@ -2,25 +2,28 @@
 The main QuerySet implementation. This provides the public API for the ORM.
 """
 
-from collections import deque, OrderedDict
 import copy
 import sys
 import warnings
+from collections import OrderedDict, deque
 
 from django.conf import settings
 from django.core import exceptions
-from django.db import (connections, router, transaction, IntegrityError,
-    DJANGO_VERSION_PICKLE_KEY)
-from django.db.models.constants import LOOKUP_SEP
-from django.db.models.fields import AutoField
-from django.db.models.query_utils import Q, deferred_class_factory, InvalidQuery
-from django.db.models.deletion import Collector
-from django.db.models.sql.constants import CURSOR
+from django.db import (
+    DJANGO_VERSION_PICKLE_KEY, IntegrityError, connections, router,
+    transaction,
+)
 from django.db.models import sql
-from django.db.models.expressions import Date, DateTime, F
+from django.db.models.constants import LOOKUP_SEP
+from django.db.models.deletion import Collector
+from django.db.models.expressions import F, Date, DateTime
+from django.db.models.fields import AutoField
+from django.db.models.query_utils import (
+    Q, InvalidQuery, deferred_class_factory,
+)
+from django.db.models.sql.constants import CURSOR
+from django.utils import six, timezone
 from django.utils.functional import partition
-from django.utils import six
-from django.utils import timezone
 from django.utils.version import get_version
 
 # The maximum number of items to display in a QuerySet.__repr__
@@ -54,7 +57,7 @@ class ModelIterator(BaseIterator):
         model_cls = klass_info['model']
         select_fields = klass_info['select_fields']
         model_fields_start, model_fields_end = select_fields[0], select_fields[-1] + 1
-        init_list = [f[0].output_field.attname
+        init_list = [f[0].target.attname
                      for f in select[model_fields_start:model_fields_end]]
         if len(init_list) != len(model_cls._meta.concrete_fields):
             init_set = set(init_list)
@@ -398,6 +401,11 @@ class QuerySet(object):
         obj.save(force_insert=True, using=self.db)
         return obj
 
+    def _populate_pk_values(self, objs):
+        for obj in objs:
+            if obj.pk is None:
+                obj.pk = obj._meta.pk.get_pk_value_on_save(obj)
+
     def bulk_create(self, objs, batch_size=None):
         """
         Inserts each of the instances into the database. This does *not* call
@@ -422,6 +430,8 @@ class QuerySet(object):
         self._for_write = True
         connection = connections[self.db]
         fields = self.model._meta.local_concrete_fields
+        objs = list(objs)
+        self._populate_pk_values(objs)
         with transaction.atomic(using=self.db, savepoint=False):
             if (connection.features.can_combine_inserts_with_and_without_auto_increment_pk
                     and self.model._meta.has_auto_field):
@@ -1608,7 +1618,7 @@ class RelatedPopulator(object):
             self.cols_start = select_fields[0]
             self.cols_end = select_fields[-1] + 1
             self.init_list = [
-                f[0].output_field.attname for f in select[self.cols_start:self.cols_end]
+                f[0].target.attname for f in select[self.cols_start:self.cols_end]
             ]
             self.reorder_for_init = None
         else:
@@ -1617,7 +1627,7 @@ class RelatedPopulator(object):
             ]
             reorder_map = []
             for idx in select_fields:
-                field = select[idx][0].output_field
+                field = select[idx][0].target
                 init_pos = model_init_attnames.index(field.attname)
                 reorder_map.append((init_pos, field.attname, idx))
             reorder_map.sort()

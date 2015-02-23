@@ -388,7 +388,7 @@ Simple tags
 .. method:: django.template.Library.simple_tag()
 
 Many template tags take a number of arguments -- strings or template variables
--- and return a string after doing some processing based solely on
+-- and return a result after doing some processing based solely on
 the input arguments and some external information. For example, a
 ``current_time`` tag might accept a format string and return the time as a
 string formatted accordingly.
@@ -458,6 +458,18 @@ positional arguments. For example:
 .. code-block:: html+django
 
     {% my_tag 123 "abcd" book.title warning=message|lower profile=user.profile %}
+
+.. versionadded:: 1.9
+
+It's possible to store the tag results in a template variable rather than
+directly outputting it. This is done by using the ``as`` argument followed by
+the variable name. Doing so enables you to output the content yourself where
+you see fit:
+
+.. code-block:: html+django
+
+    {% get_current_time "%Y-%m-%d %I:%M %p" as the_time %}
+    <p>The time is {{ the_time }}.</p>
 
 .. _howto-custom-template-tags-inclusion-tags:
 
@@ -602,11 +614,15 @@ Assignment tags
 
 .. method:: django.template.Library.assignment_tag()
 
+.. deprecated:: 1.9
+
+    ``simple_tag`` can now store results in a template variable and should
+    be used instead.
+
 To ease the creation of tags setting a variable in the context, Django provides
 a helper function, ``assignment_tag``. This function works the same way as
-:ref:`simple_tag<howto-custom-template-tags-simple-tags>`, except that it
-stores the tag's result in a specified context variable instead of directly
-outputting it.
+:meth:`~django.template.Library.simple_tag` except that it stores the tag's
+result in a specified context variable instead of directly outputting it.
 
 Our earlier ``current_time`` function could thus be written like this::
 
@@ -621,38 +637,6 @@ followed by the variable name, and output it yourself where you see fit:
 
     {% get_current_time "%Y-%m-%d %I:%M %p" as the_time %}
     <p>The time is {{ the_time }}.</p>
-
-If your template tag needs to access the current context, you can use the
-``takes_context`` argument when registering your tag::
-
-    @register.assignment_tag(takes_context=True)
-    def get_current_time(context, format_string):
-        timezone = context['timezone']
-        return your_get_current_time_method(timezone, format_string)
-
-Note that the first parameter to the function *must* be called ``context``.
-
-For more information on how the ``takes_context`` option works, see the section
-on :ref:`inclusion tags<howto-custom-template-tags-inclusion-tags>`.
-
-``assignment_tag`` functions may accept any number of positional or keyword
-arguments. For example::
-
-    @register.assignment_tag
-    def my_tag(a, b, *args, **kwargs):
-        warning = kwargs['warning']
-        profile = kwargs['profile']
-        ...
-        return ...
-
-Then in the template any number of arguments, separated by spaces, may be
-passed to the template tag. Like in Python, the values for keyword arguments
-are set using the equal sign ("``=``") and must be provided after the
-positional arguments. For example:
-
-.. code-block:: html+django
-
-    {% my_tag 123 "abcd" book.title warning=message|lower profile=user.profile as the_result %}
 
 Advanced custom template tags
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -706,9 +690,13 @@ object::
             # split_contents() knows not to split quoted strings.
             tag_name, format_string = token.split_contents()
         except ValueError:
-            raise template.TemplateSyntaxError("%r tag requires a single argument" % token.contents.split()[0])
+            raise template.TemplateSyntaxError(
+                "%r tag requires a single argument" % token.contents.split()[0]
+            )
         if not (format_string[0] == format_string[-1] and format_string[0] in ('"', "'")):
-            raise template.TemplateSyntaxError("%r tag's argument should be in quotes" % tag_name)
+            raise template.TemplateSyntaxError(
+                "%r tag's argument should be in quotes" % tag_name
+            )
         return CurrentTimeNode(format_string[1:-1])
 
 Notes:
@@ -772,11 +760,11 @@ Notes:
 * The ``render()`` method is where the work actually happens.
 
 * ``render()`` should generally fail silently, particularly in a production
-  environment where :setting:`DEBUG` and :setting:`TEMPLATE_DEBUG` are
-  ``False``. In some cases however, particularly if :setting:`TEMPLATE_DEBUG` is
-  ``True``, this method may raise an exception to make debugging easier. For
-  example, several core tags raise ``django.template.TemplateSyntaxError``
-  if they receive the wrong number or type of arguments.
+  environment. In some cases however, particularly if
+  ``context.template.engine.debug`` is ``True``, this method may raise an
+  exception to make debugging easier. For example, several core tags raise
+  ``django.template.TemplateSyntaxError`` if they receive the wrong number or
+  type of arguments.
 
 Ultimately, this decoupling of compilation and rendering results in an
 efficient template system, because a template can render multiple contexts
@@ -812,16 +800,17 @@ This is not a very common situation, but it's useful if you're rendering a
 template yourself. For example::
 
     def render(self, context):
-        t = context.engine.get_template('small_fragment.html')
+        t = context.template.engine.get_template('small_fragment.html')
         return t.render(Context({'var': obj}, autoescape=context.autoescape))
 
 .. versionchanged:: 1.8
 
-    The ``engine`` attribute of ``Context`` objects was added in Django 1.8.
-    :meth:`context.engine.get_template <django.template.Engine.get_template>`
-    must be used instead of :func:`django.template.loader.get_template`
-    because the latter now returns a wrapper whose ``render`` method doesn't
-    accept a :class:`~django.template.Context`.
+    The ``template`` attribute of ``Context`` objects was added in Django 1.8.
+    :meth:`context.template.engine.get_template
+    <django.template.Engine.get_template>` must be used instead of
+    :func:`django.template.loader.get_template` because the latter now returns
+    a wrapper whose ``render`` method doesn't accept a
+    :class:`~django.template.Context`.
 
 If we had neglected to pass in the current ``context.autoescape`` value to our
 new ``Context`` in this example, the results would have *always* been
@@ -976,9 +965,13 @@ Now your tag should begin to look like this::
             # split_contents() knows not to split quoted strings.
             tag_name, date_to_be_formatted, format_string = token.split_contents()
         except ValueError:
-            raise template.TemplateSyntaxError("%r tag requires exactly two arguments" % token.contents.split()[0])
+            raise template.TemplateSyntaxError(
+                "%r tag requires exactly two arguments" % token.contents.split()[0]
+            )
         if not (format_string[0] == format_string[-1] and format_string[0] in ('"', "'")):
-            raise template.TemplateSyntaxError("%r tag's argument should be in quotes" % tag_name)
+            raise template.TemplateSyntaxError(
+                "%r tag's argument should be in quotes" % tag_name
+            )
         return FormatTimeNode(date_to_be_formatted, format_string[1:-1])
 
 You also have to change the renderer to retrieve the actual contents of the
@@ -1074,13 +1067,17 @@ class, like so::
             # Splitting by None == splitting by spaces.
             tag_name, arg = token.contents.split(None, 1)
         except ValueError:
-            raise template.TemplateSyntaxError("%r tag requires arguments" % token.contents.split()[0])
+            raise template.TemplateSyntaxError(
+                "%r tag requires arguments" % token.contents.split()[0]
+            )
         m = re.search(r'(.*?) as (\w+)', arg)
         if not m:
             raise template.TemplateSyntaxError("%r tag had invalid arguments" % tag_name)
         format_string, var_name = m.groups()
         if not (format_string[0] == format_string[-1] and format_string[0] in ('"', "'")):
-            raise template.TemplateSyntaxError("%r tag's argument should be in quotes" % tag_name)
+            raise template.TemplateSyntaxError(
+                "%r tag's argument should be in quotes" % tag_name
+            )
         return CurrentTimeNode3(format_string[1:-1], var_name)
 
 The difference here is that ``do_current_time()`` grabs the format string and

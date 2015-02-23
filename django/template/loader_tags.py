@@ -1,9 +1,11 @@
 from collections import defaultdict
 
-from django.template.base import TemplateSyntaxError, Library, Node, TextNode,\
-    token_kwargs, Variable
-from django.utils.safestring import mark_safe
+from django.template.base import (
+    Library, Node, Template, TemplateSyntaxError, TextNode, Variable,
+    token_kwargs,
+)
 from django.utils import six
+from django.utils.safestring import mark_safe
 
 register = Library()
 
@@ -99,9 +101,13 @@ class ExtendsNode(Node):
                 error_msg += " Got this from the '%s' variable." %\
                     self.parent_name.token
             raise TemplateSyntaxError(error_msg)
-        if hasattr(parent, 'render'):
-            return parent  # parent is a Template object
-        return context.engine.get_template(parent)
+        if isinstance(parent, Template):
+            # parent is a django.template.Template
+            return parent
+        if isinstance(getattr(parent, 'template', None), Template):
+            # parent is a django.template.backends.django.Template
+            return parent.template
+        return context.template.engine.get_template(parent)
 
     def render(self, context):
         compiled_parent = self.get_parent(context)
@@ -142,7 +148,7 @@ class IncludeNode(Node):
             # Does this quack like a Template?
             if not callable(getattr(template, 'render', None)):
                 # If not, we'll try get_template
-                template = context.engine.get_template(template)
+                template = context.template.engine.get_template(template)
             values = {
                 name: var.resolve(context)
                 for name, var in six.iteritems(self.extra_context)
@@ -152,7 +158,7 @@ class IncludeNode(Node):
             with context.push(**values):
                 return template.render(context)
         except Exception:
-            if context.engine.debug:
+            if context.template.engine.debug:
                 raise
             return ''
 

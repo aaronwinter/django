@@ -6,13 +6,15 @@ from django.apps import apps
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.sessions.backends.db import SessionStore
 from django.db.models import Count
-from django.db.models.query_utils import deferred_class_factory, DeferredAttribute
+from django.db.models.query_utils import (
+    DeferredAttribute, deferred_class_factory,
+)
 from django.test import TestCase, override_settings
 
 from .models import (
-    ResolveThis, Item, RelatedItem, Child, Leaf, Proxy, SimpleItem, Feature,
-    ItemAndSimpleItem, OneToOneItem, SpecialFeature, Location, Request,
-    ProxyRelated, Derived, Base,
+    Base, Child, Derived, Feature, Item, ItemAndSimpleItem, Leaf, Location,
+    OneToOneItem, Proxy, ProxyRelated, RelatedItem, Request, ResolveThis,
+    SimpleItem, SpecialFeature,
 )
 
 
@@ -219,7 +221,7 @@ class DeferRegressionTest(TestCase):
         self.assertEqual(obj.item, item2)
         self.assertEqual(obj.item_id, item2.id)
 
-    def test_proxy_model_defer_with_selected_related(self):
+    def test_proxy_model_defer_with_select_related(self):
         # Regression for #22050
         item = Item.objects.create(name="first", value=47)
         RelatedItem.objects.create(item=item)

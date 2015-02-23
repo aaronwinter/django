@@ -20,6 +20,8 @@ details on these changes.
 
 * The ``django.forms.extras`` package will be removed.
 
+* The ``assignment_tag`` helper will be removed.
+
 .. _deprecation-removed-in-2.0:
 
 2.0
@@ -114,6 +116,7 @@ details on these changes.
 
   * ``ALLOWED_INCLUDE_ROOTS``
   * ``TEMPLATE_CONTEXT_PROCESSORS``
+  * ``TEMPLATE_DEBUG``
   * ``TEMPLATE_DIRS``
   * ``TEMPLATE_LOADERS``
   * ``TEMPLATE_STRING_IF_INVALID``
@@ -179,6 +182,10 @@ details on these changes.
 
 * Ability to specify ``ContentType.name`` when creating a content type instance
   will be removed.
+
+* Support for the old signature of ``allow_migrate`` will be removed. It changed
+  from ``allow_migrate(self, db, model)`` to
+  ``allow_migrate(self, db, app_label, model_name=None, **hints)``.
 
 .. _deprecation-removed-in-1.9:
 

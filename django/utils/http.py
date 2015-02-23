@@ -5,17 +5,17 @@ import calendar
 import datetime
 import re
 import sys
-
 from binascii import Error as BinasciiError
 from email.utils import formatdate
 
+from django.utils import six
 from django.utils.datastructures import MultiValueDict
 from django.utils.encoding import force_bytes, force_str, force_text
 from django.utils.functional import allow_lazy
-from django.utils import six
 from django.utils.six.moves.urllib.parse import (
-    quote, quote_plus, unquote, unquote_plus, urlparse,
-    urlencode as original_urlencode)
+    quote, quote_plus, unquote, unquote_plus, urlencode as original_urlencode,
+    urlparse,
+)
 
 ETAG_MATCH = re.compile(r'(?:W/)?"((?:\\.|[^"])*)"')
 
@@ -32,6 +32,11 @@ ASCTIME_DATE = re.compile(r'^\w{3} %s %s %s %s$' % (__M, __D2, __T, __Y))
 
 RFC3986_GENDELIMS = str(":/?#[]@")
 RFC3986_SUBDELIMS = str("!$&'()*+,;=")
+
+PROTOCOL_TO_PORT = {
+    'http': 80,
+    'https': 443,
+}
 
 
 def urlquote(url, safe='/'):
@@ -253,8 +258,10 @@ def same_origin(url1, url2):
     """
     p1, p2 = urlparse(url1), urlparse(url2)
     try:
-        return (p1.scheme, p1.hostname, p1.port) == (p2.scheme, p2.hostname, p2.port)
-    except ValueError:
+        o1 = (p1.scheme, p1.hostname, p1.port or PROTOCOL_TO_PORT[p1.scheme])
+        o2 = (p2.scheme, p2.hostname, p2.port or PROTOCOL_TO_PORT[p2.scheme])
+        return o1 == o2
+    except (ValueError, KeyError):
         return False
 
 

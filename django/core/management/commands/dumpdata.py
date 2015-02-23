@@ -1,9 +1,9 @@
 from collections import OrderedDict
 
 from django.apps import apps
-from django.core.management.base import BaseCommand, CommandError
 from django.core import serializers
-from django.db import router, DEFAULT_DB_ALIAS
+from django.core.management.base import BaseCommand, CommandError
+from django.db import DEFAULT_DB_ALIAS, router
 
 
 class Command(BaseCommand):
@@ -132,7 +132,7 @@ class Command(BaseCommand):
             for model in serializers.sort_dependencies(app_list.items()):
                 if model in excluded_models:
                     continue
-                if not model._meta.proxy and router.allow_migrate(using, model):
+                if not model._meta.proxy and router.allow_migrate_model(using, model):
                     if use_base_manager:
                         objects = model._base_manager
                     else:

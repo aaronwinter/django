@@ -1,15 +1,16 @@
-from itertools import chain
 import re
 import warnings
+from itertools import chain
 
 from django.core.exceptions import FieldError
 from django.db.models.constants import LOOKUP_SEP
 from django.db.models.expressions import OrderBy, Random, RawSQL, Ref
-from django.db.models.query_utils import select_related_descend, QueryWrapper
-from django.db.models.sql.constants import (CURSOR, SINGLE, MULTI, NO_RESULTS,
-        ORDER_DIR, GET_ITERATOR_CHUNK_SIZE)
+from django.db.models.query_utils import QueryWrapper, select_related_descend
+from django.db.models.sql.constants import (
+    CURSOR, GET_ITERATOR_CHUNK_SIZE, MULTI, NO_RESULTS, ORDER_DIR, SINGLE,
+)
 from django.db.models.sql.datastructures import EmptyResultSet
-from django.db.models.sql.query import get_order_dir, Query
+from django.db.models.sql.query import Query, get_order_dir
 from django.db.transaction import TransactionManagementError
 from django.db.utils import DatabaseError
 from django.utils.deprecation import RemovedInDjango20Warning
@@ -46,6 +47,7 @@ class SQLCompiler(object):
         """
         self.setup_query()
         order_by = self.get_order_by()
+        self.where, self.having = self.query.where.split_having()
         extra_select = self.get_extra_select(order_by, self.select)
         group_by = self.get_group_by(self.select + extra_select, order_by)
         return extra_select, order_by, group_by
@@ -116,12 +118,12 @@ class SQLCompiler(object):
             if is_ref:
                 continue
             expressions.extend(expr.get_source_expressions())
-        having = self.query.having.get_group_by_cols()
-        for expr in having:
+        having_group_by = self.having.get_group_by_cols() if self.having else ()
+        for expr in having_group_by:
             expressions.append(expr)
         result = []
         seen = set()
-        expressions = self.collapse_group_by(expressions, having)
+        expressions = self.collapse_group_by(expressions, having_group_by)
 
         for expr in expressions:
             sql, params = self.compile(expr)
@@ -355,11 +357,8 @@ class SQLCompiler(object):
         If 'with_limits' is False, any limit/offset information is not included
         in the query.
         """
-        # After executing the query, we must get rid of any joins the query
-        # setup created. So, take note of alias counts before the query ran.
-        # However we do not want to get rid of stuff done in pre_sql_setup(),
-        # as the pre_sql_setup will modify query state in a way that forbids
-        # another run of it.
+        if with_limits and self.query.low_mark == self.query.high_mark:
+            return '', ()
         self.subquery = subquery
         refcounts_before = self.query.alias_refcount.copy()
         try:
@@ -372,8 +371,8 @@ class SQLCompiler(object):
             # docstring of get_from_clause() for details.
             from_, f_params = self.get_from_clause()
 
-            where, w_params = self.compile(self.query.where)
-            having, h_params = self.compile(self.query.having)
+            where, w_params = self.compile(self.where) if self.where is not None else ("", [])
+            having, h_params = self.compile(self.having) if self.having is not None else ("", [])
             params = []
             result = ['SELECT']
 
@@ -761,17 +760,15 @@ class SQLCompiler(object):
                 backend_converters = self.connection.ops.get_db_converters(expression)
                 field_converters = expression.get_db_converters(self.connection)
                 if backend_converters or field_converters:
-                    converters[i] = (backend_converters, field_converters, expression)
+                    converters[i] = (backend_converters + field_converters, expression)
         return converters
 
     def apply_converters(self, row, converters):
         row = list(row)
-        for pos, (backend_converters, field_converters, field) in converters.items():
+        for pos, (convs, expression) in converters.items():
             value = row[pos]
-            for converter in backend_converters:
-                value = converter(value, field, self.query.context)
-            for converter in field_converters:
-                value = converter(value, self.connection, self.query.context)
+            for converter in convs:
+                value = converter(value, expression, self.connection, self.query.context)
             row[pos] = value
         return tuple(row)
 

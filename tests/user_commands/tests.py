@@ -1,18 +1,26 @@
 import os
 
 from django.apps import apps
-from django.db import connection
 from django.core import management
 from django.core.management import BaseCommand, CommandError, find_commands
 from django.core.management.utils import find_command, popen_wrapper
-from django.test import SimpleTestCase, ignore_warnings
+from django.db import connection
+from django.test import SimpleTestCase, ignore_warnings, override_settings
 from django.test.utils import captured_stderr, captured_stdout, extend_sys_path
 from django.utils import translation
-from django.utils.deprecation import RemovedInDjango20Warning
 from django.utils._os import upath
+from django.utils.deprecation import RemovedInDjango20Warning
 from django.utils.six import StringIO
 
 
+# A minimal set of apps to avoid system checks running on all apps.
+@override_settings(
+    INSTALLED_APPS=[
+        'django.contrib.auth',
+        'django.contrib.contenttypes',
+        'user_commands',
+    ],
+)
 class CommandTests(SimpleTestCase):
     def test_command(self):
         out = StringIO()

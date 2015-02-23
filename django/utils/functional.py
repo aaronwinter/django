@@ -1,7 +1,7 @@
 import copy
 import operator
-from functools import wraps
 import sys
+from functools import wraps
 
 from django.utils import six
 from django.utils.six.moves import copyreg
@@ -95,6 +95,7 @@ def lazy(func, *resultclasses):
                     cls.__str__ = cls.__text_cast
                 else:
                     cls.__unicode__ = cls.__text_cast
+                    cls.__str__ = cls.__bytes_cast_encoded
             elif cls._delegate_bytes:
                 if six.PY3:
                     cls.__bytes__ = cls.__bytes_cast
@@ -116,6 +117,9 @@ def lazy(func, *resultclasses):
 
         def __bytes_cast(self):
             return bytes(func(*self.__args, **self.__kw))
+
+        def __bytes_cast_encoded(self):
+            return func(*self.__args, **self.__kw).encode('utf-8')
 
         def __cast(self):
             if self._delegate_bytes:
@@ -176,6 +180,8 @@ def allow_lazy(func, *resultclasses):
     immediately, otherwise a __proxy__ is returned that will evaluate the
     function when needed.
     """
+    lazy_func = lazy(func, *resultclasses)
+
     @wraps(func)
     def wrapper(*args, **kwargs):
         for arg in list(args) + list(six.itervalues(kwargs)):
@@ -183,7 +189,7 @@ def allow_lazy(func, *resultclasses):
                 break
         else:
             return func(*args, **kwargs)
-        return lazy(func, *resultclasses)(*args, **kwargs)
+        return lazy_func(*args, **kwargs)
     return wrapper
 
 empty = object()

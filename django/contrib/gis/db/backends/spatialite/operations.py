@@ -1,9 +1,10 @@
 import re
 import sys
 
-from django.contrib.gis.db.backends.base.operations import BaseSpatialOperations
-from django.contrib.gis.db.backends.utils import SpatialOperator
+from django.contrib.gis.db.backends.base.operations import \
+    BaseSpatialOperations
 from django.contrib.gis.db.backends.spatialite.adapter import SpatiaLiteAdapter
+from django.contrib.gis.db.backends.utils import SpatialOperator
 from django.contrib.gis.db.models import aggregates
 from django.contrib.gis.geometry.backend import Geometry
 from django.contrib.gis.measure import Distance
@@ -261,7 +262,7 @@ class SpatiaLiteOperations(BaseSpatialOperations, DatabaseOperations):
             converters.append(self.convert_geometry)
         return converters
 
-    def convert_geometry(self, value, expression, context):
+    def convert_geometry(self, value, expression, connection, context):
         if value:
             value = Geometry(value)
             if 'transformed_srid' in context:

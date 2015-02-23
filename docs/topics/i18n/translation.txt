@@ -699,11 +699,6 @@ will result in the entry ``"First sentence. Second paragraph."`` in the PO file,
 compared to ``"\n  First sentence.\n  Second sentence.\n"``, if the ``trimmed``
 option had not been specified.
 
-.. versionchanged:: 1.7
-
-    The ``trimmed`` option was added.
-
-
 String literals passed to tags and filters
 ------------------------------------------
 
@@ -853,7 +848,7 @@ information for a list of languages (e.g. active languages as specified in
 view <set_language-redirect-view>` for an example of how to display a language
 selector using ``{% get_language_info_list %}``.
 
-In addition to :setting:`LANGUAGES` style nested tuples,
+In addition to :setting:`LANGUAGES` style list of tuples,
 ``{% get_language_info_list %}`` supports simple lists of language codes.
 If you do this in your view:
 
@@ -1275,16 +1270,13 @@ is configured correctly). It creates (or updates) a message file in the
 directory ``locale/LANG/LC_MESSAGES``. In the ``de`` example, the file will be
 ``locale/de/LC_MESSAGES/django.po``.
 
-.. versionchanged:: 1.7
-
-    When you run ``makemessages`` from the root directory of your project, the
-    extracted strings will be automatically distributed to the proper message
-    files. That is, a string extracted from a file of an app containing a
-    ``locale`` directory will go in a message file under that directory.
-    A string extracted from a file of an app without any ``locale`` directory
-    will either go in a message file under the directory listed first in
-    :setting:`LOCALE_PATHS` or will generate an error if :setting:`LOCALE_PATHS`
-    is empty.
+When you run ``makemessages`` from the root directory of your project, the
+extracted strings will be automatically distributed to the proper message files.
+That is, a string extracted from a file of an app containing a ``locale``
+directory will go in a message file under that directory. A string extracted
+from a file of an app without any ``locale`` directory will either go in a
+message file under the directory listed first in :setting:`LOCALE_PATHS` or
+will generate an error if :setting:`LOCALE_PATHS` is empty.
 
 By default :djadmin:`django-admin makemessages <makemessages>` examines every
 file that has the ``.html`` or ``.txt`` file extension. In case you want to
@@ -1357,12 +1349,10 @@ otherwise, they'll be tacked together without whitespace!
 
 .. admonition:: Mind your charset
 
-    When creating a PO file with your favorite text editor, first edit
-    the charset line (search for ``"CHARSET"``) and set it to the charset
-    you'll be using to edit the content. Due to the way the ``gettext`` tools
-    work internally and because we want to allow non-ASCII source strings in
-    Django's core and your applications, you **must** use UTF-8 as the encoding
-    for your PO file. This means that everybody will be using the same
+    Due to the way the ``gettext`` tools work internally and because we want to
+    allow non-ASCII source strings in Django's core and your applications, you
+    **must** use UTF-8 as the encoding for your PO files (the default when PO
+    files are created).  This means that everybody will be using the same
     encoding, which is important when Django processes the PO files.
 
 To reexamine all source code and templates for new translation strings and
@@ -1627,13 +1617,9 @@ Language cookie
 A number of settings can be used to adjust language cookie options:
 
 * :setting:`LANGUAGE_COOKIE_NAME`
-
-.. versionadded:: 1.7
-
 * :setting:`LANGUAGE_COOKIE_AGE`
 * :setting:`LANGUAGE_COOKIE_DOMAIN`
 * :setting:`LANGUAGE_COOKIE_PATH`
-
 
 Implementation notes
 ====================
@@ -1696,11 +1682,11 @@ matters, you should follow these guidelines:
 
 For example, your :setting:`MIDDLEWARE_CLASSES` might look like this::
 
-    MIDDLEWARE_CLASSES = (
+    MIDDLEWARE_CLASSES = [
        'django.contrib.sessions.middleware.SessionMiddleware',
        'django.middleware.locale.LocaleMiddleware',
        'django.middleware.common.CommonMiddleware',
-    )
+    ]
 
 (For more on middleware, see the :doc:`middleware documentation
 </topics/http/middleware>`.)
@@ -1715,11 +1701,6 @@ following this algorithm:
 
 * Failing that, it looks for the :data:`~django.utils.translation.LANGUAGE_SESSION_KEY`
   key in the current user's session.
-
-  .. versionchanged:: 1.7
-
-      In previous versions, the key was named ``django_language``, and the
-      ``LANGUAGE_SESSION_KEY`` constant did not exist.
 
 * Failing that, it looks for a cookie.
 
@@ -1751,10 +1732,10 @@ Notes:
   languages (because your application doesn't provide all those languages),
   set :setting:`LANGUAGES` to a list of languages. For example::
 
-      LANGUAGES = (
+      LANGUAGES = [
         ('de', _('German')),
         ('en', _('English')),
-      )
+      ]
 
   This example restricts languages that are available for automatic
   selection to German and English (and any sublanguage, like de-ch or
@@ -1769,10 +1750,10 @@ Notes:
 
       from django.utils.translation import ugettext_lazy as _
 
-      LANGUAGES = (
+      LANGUAGES = [
           ('de', _('German')),
           ('en', _('English')),
-      )
+      ]
 
 Once ``LocaleMiddleware`` determines the user's preference, it makes this
 preference available as ``request.LANGUAGE_CODE`` for each

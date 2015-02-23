@@ -14,10 +14,10 @@ def create_default_site(app_config, verbosity=2, interactive=True, using=DEFAULT
     except LookupError:
         return
 
-    if not router.allow_migrate(using, Site):
+    if not router.allow_migrate_model(using, Site):
         return
 
-    if not Site.objects.exists():
+    if not Site.objects.using(using).exists():
         # The default settings set SITE_ID = 1, and some tests in Django's test
         # suite rely on this value. However, if database sequences are reused
         # (e.g. in the test suite after flush/syncdb), it isn't guaranteed that

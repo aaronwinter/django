@@ -8,7 +8,6 @@ from django.db import router
 from django.utils.six import StringIO
 from django.utils.six.moves import input
 
-
 # The prefix to put on the default database name when creating
 # the test database.
 TEST_DATABASE_PREFIX = 'test_'
@@ -108,7 +107,7 @@ class BaseDatabaseCreation(object):
         def get_objects():
             for model in serializers.sort_dependencies(app_list):
                 if (not model._meta.proxy and model._meta.managed and
-                        router.allow_migrate(self.connection.alias, model)):
+                        router.allow_migrate_model(self.connection.alias, model)):
                     queryset = model._default_manager.using(self.connection.alias).order_by(model._meta.pk.name)
                     for obj in queryset.iterator():
                         yield obj

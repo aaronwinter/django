@@ -1,19 +1,19 @@
 import datetime
-from inspect import getargspec
 import os
 import warnings
+from inspect import getargspec
 
 from django import forms
-from django.db.models.fields import Field
 from django.core import checks
 from django.core.files.base import File
-from django.core.files.storage import default_storage
 from django.core.files.images import ImageFile
+from django.core.files.storage import default_storage
 from django.db.models import signals
-from django.utils.encoding import force_str, force_text
+from django.db.models.fields import Field
 from django.utils import six
-from django.utils.translation import ugettext_lazy as _
 from django.utils.deprecation import RemovedInDjango20Warning
+from django.utils.encoding import force_str, force_text
+from django.utils.translation import ugettext_lazy as _
 
 
 class FieldFile(File):
@@ -203,7 +203,7 @@ class FileDescriptor(object):
             instance.__dict__[self.field.name] = attr
 
         # Other types of files may be assigned as well, but they need to have
-        # the FieldFile interface added to the. Thus, we wrap any other type of
+        # the FieldFile interface added to them. Thus, we wrap any other type of
         # File inside a FieldFile (well, the field's attr_class, which is
         # usually FieldFile).
         elif isinstance(file, File) and not isinstance(file, FieldFile):

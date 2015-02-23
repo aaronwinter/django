@@ -1,7 +1,7 @@
-from collections import Counter, defaultdict, OrderedDict
 import sys
 import threading
 import warnings
+from collections import Counter, OrderedDict, defaultdict
 
 from django.core.exceptions import AppRegistryNotReady, ImproperlyConfigured
 from django.utils import lru_cache
@@ -227,9 +227,7 @@ class Apps(object):
         Returns the app config for the inner application in case of nesting.
         Returns None if the object isn't in any registered app config.
         """
-        # In Django 1.7 and 1.8, it's allowed to call this method at import
-        # time, even while the registry is being populated. In Django 1.9 and
-        # later, that should be forbidden with `self.check_apps_ready()`.
+        self.check_apps_ready()
         candidates = []
         for app_config in self.app_configs.values():
             if object_name.startswith(app_config.name):

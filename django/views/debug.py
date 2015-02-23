@@ -1,26 +1,23 @@
 from __future__ import unicode_literals
 
-import datetime
 import os
 import re
 import sys
 import types
 
 from django.conf import settings
-from django.core.exceptions import ImproperlyConfigured
-from django.core.urlresolvers import resolve, Resolver404
-from django.http import (HttpResponse, HttpResponseNotFound, HttpRequest,
-    build_request_repr)
+from django.core.urlresolvers import Resolver404, resolve
+from django.http import (
+    HttpRequest, HttpResponse, HttpResponseNotFound, build_request_repr,
+)
 from django.template import Context, Engine, TemplateDoesNotExist
 from django.template.defaultfilters import force_escape, pprint
+from django.utils import lru_cache, six, timezone
 from django.utils.datastructures import MultiValueDict
-from django.utils.html import escape
 from django.utils.encoding import force_bytes, smart_text
-from django.utils import lru_cache
+from django.utils.html import escape
 from django.utils.module_loading import import_string
-from django.utils import six
 from django.utils.translation import ugettext as _
-
 
 # Minimal Django templates engine to render the error templates
 # regardless of the project's TEMPLATES setting.
@@ -282,7 +279,11 @@ class ExceptionReporter(object):
         """Return a dictionary containing traceback information."""
         try:
             default_template_engine = Engine.get_default()
-        except ImproperlyConfigured:
+        except Exception:
+            # Since the debug view must never crash, catch all exceptions.
+            # If Django can't find a default template engine, get_default()
+            # raises ImproperlyConfigured. If some template engines fail to
+            # load, any exception may be raised.
             default_template_engine = None
 
         # TODO: add support for multiple template engines (#24120).
@@ -360,7 +361,7 @@ class ExceptionReporter(object):
             'settings': get_safe_settings(),
             'sys_executable': sys.executable,
             'sys_version_info': '%d.%d.%d' % sys.version_info[0:3],
-            'server_time': datetime.datetime.now(),
+            'server_time': timezone.now(),
             'django_version_info': get_version(),
             'sys_path': sys.path,
             'template_info': self.template_info,

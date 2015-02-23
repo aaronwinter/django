@@ -1,5 +1,5 @@
-from copy import copy
 import inspect
+from copy import copy
 
 from django.conf import settings
 from django.utils import timezone
@@ -86,6 +86,10 @@ class Transform(RegisterLookupMixin):
         if self.bilateral:
             bilateral_transforms.append((self.__class__, self.init_lookups))
         return bilateral_transforms
+
+    @cached_property
+    def contains_aggregate(self):
+        return self.lhs.contains_aggregate
 
 
 class Lookup(RegisterLookupMixin):
@@ -188,6 +192,10 @@ class Lookup(RegisterLookupMixin):
 
     def as_sql(self, compiler, connection):
         raise NotImplementedError
+
+    @cached_property
+    def contains_aggregate(self):
+        return self.lhs.contains_aggregate or getattr(self.rhs, 'contains_aggregate', False)
 
 
 class BuiltinLookup(Lookup):

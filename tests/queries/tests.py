@@ -1,35 +1,37 @@
 from __future__ import unicode_literals
 
-from collections import OrderedDict
 import datetime
-from operator import attrgetter
 import pickle
 import unittest
+from collections import OrderedDict
+from operator import attrgetter
 
 from django.core.exceptions import FieldError
-from django.db import connection, DEFAULT_DB_ALIAS
-from django.db.models import Count, F, Q
-from django.db.models.sql.where import WhereNode, EverythingNode, NothingNode
+from django.db import DEFAULT_DB_ALIAS, connection
+from django.db.models import F, Q, Count
 from django.db.models.sql.constants import LOUTER
 from django.db.models.sql.datastructures import EmptyResultSet
+from django.db.models.sql.where import NothingNode, WhereNode
 from django.test import TestCase, skipUnlessDBFeature
 from django.test.utils import CaptureQueriesContext
 from django.utils import six
 from django.utils.six.moves import range
 
 from .models import (
-    Annotation, Article, Author, Celebrity, Child, Cover, Detail, DumbCategory,
-    ExtraInfo, Fan, Item, LeafA, Join, LeafB, LoopX, LoopZ, ManagedModel,
-    Member, NamedCategory, Note, Number, Plaything, PointerA, Ranking, Related,
-    Report, ReservedName, Tag, TvChef, Valid, X, Food, Eaten, Node, ObjectA,
-    ProxyObjectA, ChildObjectA, ObjectB, ProxyObjectB, ObjectC, CategoryItem,
-    SimpleCategory, SpecialCategory, OneToOneCategory, NullableName, ProxyCategory,
-    SingleObject, RelatedObject, ModelA, ModelB, ModelC, ModelD, Responsibility, Job,
-    JobResponsibilities, BaseA, FK1, Identifier, Program, Channel, Page, Paragraph,
-    Chapter, Book, MyObject, Order, OrderItem, SharedConnection, Task, Staff,
-    StaffUser, CategoryRelationship, Ticket21203Parent, Ticket21203Child, Person,
-    Company, Employment, CustomPk, CustomPkTag, Classroom, School, Student,
-    Ticket23605A, Ticket23605B, Ticket23605C)
+    FK1, X, Annotation, Article, Author, BaseA, Book, CategoryItem,
+    CategoryRelationship, Celebrity, Channel, Chapter, Child, ChildObjectA,
+    Classroom, Company, Cover, CustomPk, CustomPkTag, Detail, DumbCategory,
+    Eaten, Employment, ExtraInfo, Fan, Food, Identifier, Item, Job,
+    JobResponsibilities, Join, LeafA, LeafB, LoopX, LoopZ, ManagedModel,
+    Member, ModelA, ModelB, ModelC, ModelD, MyObject, NamedCategory, Node,
+    Note, NullableName, Number, ObjectA, ObjectB, ObjectC, OneToOneCategory,
+    Order, OrderItem, Page, Paragraph, Person, Plaything, PointerA, Program,
+    ProxyCategory, ProxyObjectA, ProxyObjectB, Ranking, Related, RelatedObject,
+    Report, ReservedName, Responsibility, School, SharedConnection,
+    SimpleCategory, SingleObject, SpecialCategory, Staff, StaffUser, Student,
+    Tag, Task, Ticket21203Child, Ticket21203Parent, Ticket23605A, Ticket23605B,
+    Ticket23605C, TvChef, Valid,
+)
 
 
 class BaseQuerysetTest(TestCase):
@@ -2851,20 +2853,10 @@ class WhereNodeTest(TestCase):
 
     def test_empty_full_handling_conjunction(self):
         compiler = WhereNodeTest.MockCompiler()
-        w = WhereNode(children=[EverythingNode()])
-        self.assertEqual(w.as_sql(compiler, connection), ('', []))
-        w.negate()
-        self.assertRaises(EmptyResultSet, w.as_sql, compiler, connection)
         w = WhereNode(children=[NothingNode()])
         self.assertRaises(EmptyResultSet, w.as_sql, compiler, connection)
         w.negate()
         self.assertEqual(w.as_sql(compiler, connection), ('', []))
-        w = WhereNode(children=[EverythingNode(), EverythingNode()])
-        self.assertEqual(w.as_sql(compiler, connection), ('', []))
-        w.negate()
-        self.assertRaises(EmptyResultSet, w.as_sql, compiler, connection)
-        w = WhereNode(children=[EverythingNode(), self.DummyNode()])
-        self.assertEqual(w.as_sql(compiler, connection), ('dummy', []))
         w = WhereNode(children=[self.DummyNode(), self.DummyNode()])
         self.assertEqual(w.as_sql(compiler, connection), ('(dummy AND dummy)', []))
         w.negate()
@@ -2876,22 +2868,10 @@ class WhereNodeTest(TestCase):
 
     def test_empty_full_handling_disjunction(self):
         compiler = WhereNodeTest.MockCompiler()
-        w = WhereNode(children=[EverythingNode()], connector='OR')
-        self.assertEqual(w.as_sql(compiler, connection), ('', []))
-        w.negate()
-        self.assertRaises(EmptyResultSet, w.as_sql, compiler, connection)
         w = WhereNode(children=[NothingNode()], connector='OR')
         self.assertRaises(EmptyResultSet, w.as_sql, compiler, connection)
         w.negate()
         self.assertEqual(w.as_sql(compiler, connection), ('', []))
-        w = WhereNode(children=[EverythingNode(), EverythingNode()], connector='OR')
-        self.assertEqual(w.as_sql(compiler, connection), ('', []))
-        w.negate()
-        self.assertRaises(EmptyResultSet, w.as_sql, compiler, connection)
-        w = WhereNode(children=[EverythingNode(), self.DummyNode()], connector='OR')
-        self.assertEqual(w.as_sql(compiler, connection), ('', []))
-        w.negate()
-        self.assertRaises(EmptyResultSet, w.as_sql, compiler, connection)
         w = WhereNode(children=[self.DummyNode(), self.DummyNode()], connector='OR')
         self.assertEqual(w.as_sql(compiler, connection), ('(dummy OR dummy)', []))
         w.negate()
@@ -2905,15 +2885,20 @@ class WhereNodeTest(TestCase):
         compiler = WhereNodeTest.MockCompiler()
         empty_w = WhereNode()
         w = WhereNode(children=[empty_w, empty_w])
-        self.assertEqual(w.as_sql(compiler, connection), (None, []))
+        self.assertEqual(w.as_sql(compiler, connection), ('', []))
         w.negate()
-        self.assertEqual(w.as_sql(compiler, connection), (None, []))
+        with self.assertRaises(EmptyResultSet):
+            w.as_sql(compiler, connection)
         w.connector = 'OR'
-        self.assertEqual(w.as_sql(compiler, connection), (None, []))
+        with self.assertRaises(EmptyResultSet):
+            w.as_sql(compiler, connection)
         w.negate()
-        self.assertEqual(w.as_sql(compiler, connection), (None, []))
+        self.assertEqual(w.as_sql(compiler, connection), ('', []))
         w = WhereNode(children=[empty_w, NothingNode()], connector='OR')
-        self.assertRaises(EmptyResultSet, w.as_sql, compiler, connection)
+        self.assertEqual(w.as_sql(compiler, connection), ('', []))
+        w = WhereNode(children=[empty_w, NothingNode()], connector='AND')
+        with self.assertRaises(EmptyResultSet):
+            w.as_sql(compiler, connection)
 
 
 class IteratorExceptionsTest(TestCase):
@@ -3677,3 +3662,10 @@ class Ticket23605Tests(TestCase):
         self.assertQuerysetEqual(qs1, [a1], lambda x: x)
         qs2 = Ticket23605A.objects.exclude(complex_q)
         self.assertQuerysetEqual(qs2, [a2], lambda x: x)
+
+
+class TestTicket24279(TestCase):
+    def test_ticket_24278(self):
+        School.objects.create()
+        qs = School.objects.filter(Q(pk__in=()) | Q())
+        self.assertQuerysetEqual(qs, [])

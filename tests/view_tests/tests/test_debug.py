@@ -16,16 +16,17 @@ from django.core import mail
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.urlresolvers import reverse
 from django.template.base import TemplateDoesNotExist
-from django.test import TestCase, RequestFactory, override_settings
-from django.utils.encoding import force_text, force_bytes
+from django.test import RequestFactory, TestCase, override_settings
 from django.utils import six
+from django.utils.encoding import force_bytes, force_text
 from django.views.debug import CallableSettingWrapper, ExceptionReporter
 
 from .. import BrokenException, except_args
-from ..views import (sensitive_view, non_sensitive_view, paranoid_view,
-    custom_exception_reporter_filter_view, sensitive_method_view,
-    sensitive_args_function_caller, sensitive_kwargs_function_caller,
-    multivalue_dict_key_error)
+from ..views import (
+    custom_exception_reporter_filter_view, multivalue_dict_key_error,
+    non_sensitive_view, paranoid_view, sensitive_args_function_caller,
+    sensitive_kwargs_function_caller, sensitive_method_view, sensitive_view,
+)
 
 
 class CallableSettingWrapperTests(TestCase):
@@ -43,8 +44,7 @@ class CallableSettingWrapperTests(TestCase):
         self.assertEqual(actual, "repr from the wrapped callable")
 
 
-@override_settings(DEBUG=True, TEMPLATE_DEBUG=True,
-                   ROOT_URLCONF="view_tests.urls")
+@override_settings(DEBUG=True, ROOT_URLCONF="view_tests.urls")
 class DebugViewTests(TestCase):
 
     def test_files(self):
@@ -546,7 +546,7 @@ class ExceptionReportTestMixin(object):
         """
         Asserts that potentially sensitive info are displayed in the email report.
         """
-        with self.settings(ADMINS=(('Admin', 'admin@fattie-breakie.com'),)):
+        with self.settings(ADMINS=[('Admin', 'admin@fattie-breakie.com')]):
             mail.outbox = []  # Empty outbox
             request = self.rf.post('/some_url/', self.breakfast_data)
             view(request)
@@ -579,7 +579,7 @@ class ExceptionReportTestMixin(object):
         """
         Asserts that certain sensitive info are not displayed in the email report.
         """
-        with self.settings(ADMINS=(('Admin', 'admin@fattie-breakie.com'),)):
+        with self.settings(ADMINS=[('Admin', 'admin@fattie-breakie.com')]):
             mail.outbox = []  # Empty outbox
             request = self.rf.post('/some_url/', self.breakfast_data)
             view(request)
@@ -619,7 +619,7 @@ class ExceptionReportTestMixin(object):
         """
         Asserts that no variables or POST parameters are displayed in the email report.
         """
-        with self.settings(ADMINS=(('Admin', 'admin@fattie-breakie.com'),)):
+        with self.settings(ADMINS=[('Admin', 'admin@fattie-breakie.com')]):
             mail.outbox = []  # Empty outbox
             request = self.rf.post('/some_url/', self.breakfast_data)
             view(request)

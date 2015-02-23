@@ -3,23 +3,21 @@ import json
 import unittest
 import uuid
 
+from django import forms
 from django.contrib.postgres.fields import ArrayField
 from django.contrib.postgres.forms import SimpleArrayField, SplitArrayField
-from django.core import exceptions, serializers
+from django.core import exceptions, serializers, validators
 from django.core.management import call_command
-from django.db import models, IntegrityError, connection
-from django import forms
-from django.test import TestCase, override_settings
+from django.db import IntegrityError, connection, models
+from django.test import TestCase, TransactionTestCase, override_settings
 from django.utils import timezone
 
 from .models import (
-    IntegerArrayModel, NullableIntegerArrayModel, CharArrayModel,
-    DateTimeArrayModel, NestedIntegerArrayModel, OtherTypesArrayModel,
-    ArrayFieldSubclass,
+    ArrayFieldSubclass, CharArrayModel, DateTimeArrayModel, IntegerArrayModel,
+    NestedIntegerArrayModel, NullableIntegerArrayModel, OtherTypesArrayModel,
 )
 
 
-@unittest.skipUnless(connection.vendor == 'postgresql', 'PostgreSQL required')
 class TestSaveLoad(TestCase):
 
     def test_integer(self):
@@ -95,7 +93,6 @@ class TestSaveLoad(TestCase):
         self.assertEqual(instance.decimals, loaded.decimals)
 
 
-@unittest.skipUnless(connection.vendor == 'postgresql', 'PostgreSQL required')
 class TestQuerying(TestCase):
 
     def setUp(self):
@@ -244,7 +241,9 @@ class TestChecks(TestCase):
         self.assertEqual(errors[0].id, 'postgres.E002')
 
 
-class TestMigrations(TestCase):
+class TestMigrations(TransactionTestCase):
+
+    available_apps = ['postgres_tests']
 
     def test_deconstruct(self):
         field = ArrayField(models.IntegerField())
@@ -273,16 +272,22 @@ class TestMigrations(TestCase):
         name, path, args, kwargs = field.deconstruct()
         self.assertEqual(path, 'postgres_tests.models.ArrayFieldSubclass')
 
-    @unittest.skipUnless(connection.vendor == 'postgresql', 'PostgreSQL required')
     @override_settings(MIGRATION_MODULES={
         "postgres_tests": "postgres_tests.array_default_migrations",
     })
     def test_adding_field_with_default(self):
         # See #22962
+        table_name = 'postgres_tests_integerarraydefaultmodel'
+        with connection.cursor() as cursor:
+            self.assertNotIn(table_name, connection.introspection.table_names(cursor))
         call_command('migrate', 'postgres_tests', verbosity=0)
+        with connection.cursor() as cursor:
+            self.assertIn(table_name, connection.introspection.table_names(cursor))
+        call_command('migrate', 'postgres_tests', 'zero', verbosity=0)
+        with connection.cursor() as cursor:
+            self.assertNotIn(table_name, connection.introspection.table_names(cursor))
 
 
-@unittest.skipUnless(connection.vendor == 'postgresql', 'PostgreSQL required')
 class TestSerialization(TestCase):
     test_data = '[{"fields": {"field": "[\\"1\\", \\"2\\"]"}, "model": "postgres_tests.integerarraymodel", "pk": null}]'
 
@@ -324,6 +329,14 @@ class TestValidation(TestCase):
             field.clean([[1, 2], [3, 4, 5]], None)
         self.assertEqual(cm.exception.code, 'nested_array_mismatch')
         self.assertEqual(cm.exception.messages[0], 'Nested arrays must have the same length.')
+
+    def test_with_validators(self):
+        field = ArrayField(models.IntegerField(validators=[validators.MinValueValidator(1)]))
+        field.clean([1, 2], None)
+        with self.assertRaises(exceptions.ValidationError) as cm:
+            field.clean([0], None)
+        self.assertEqual(cm.exception.code, 'item_invalid')
+        self.assertEqual(cm.exception.messages[0], 'Item 0 in the array did not validate: Ensure this value is greater than or equal to 1.')
 
 
 class TestSimpleFormField(TestCase):

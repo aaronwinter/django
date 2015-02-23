@@ -8,15 +8,18 @@ import unittest
 from django import template
 from django.contrib.auth.models import Group
 from django.core import urlresolvers
-from django.template import (base as template_base, loader,
-    Context, RequestContext, Template, TemplateSyntaxError)
+from django.template import (
+    Context, RequestContext, Template, TemplateSyntaxError,
+    base as template_base, engines, loader,
+)
 from django.template.engine import Engine
 from django.template.loaders import app_directories, filesystem
 from django.test import RequestFactory, SimpleTestCase
-from django.test.utils import extend_sys_path, ignore_warnings, override_settings
-from django.utils.deprecation import RemovedInDjango20Warning
+from django.test.utils import (
+    extend_sys_path, ignore_warnings, override_settings,
+)
 from django.utils._os import upath
-
+from django.utils.deprecation import RemovedInDjango20Warning
 
 TESTS_DIR = os.path.dirname(os.path.dirname(os.path.abspath(upath(__file__))))
 
@@ -82,10 +85,12 @@ class TemplateLoaderTests(SimpleTestCase):
     @override_settings(TEMPLATES=[{
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
         'DIRS': [TEMPLATES_DIR],
+        'OPTIONS': {
+            # Turn DEBUG on, so that the origin file name will be kept with
+            # the compiled templates.
+            'debug': True,
+        }
     }])
-    # Turn TEMPLATE_DEBUG on, so that the origin file name will be kept with
-    # the compiled templates.
-    @override_settings(TEMPLATE_DEBUG=True)
     def test_loader_debug_origin(self):
         load_name = 'login.html'
 
@@ -101,6 +106,7 @@ class TemplateLoaderTests(SimpleTestCase):
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
         'DIRS': [TEMPLATES_DIR],
         'OPTIONS': {
+            'debug': True,
             'loaders': [
                 ('django.template.loaders.cached.Loader', [
                     'django.template.loaders.filesystem.Loader',
@@ -108,7 +114,6 @@ class TemplateLoaderTests(SimpleTestCase):
             ],
         },
     }])
-    @override_settings(TEMPLATE_DEBUG=True)
     def test_cached_loader_debug_origin(self):
         load_name = 'login.html'
 
@@ -123,12 +128,12 @@ class TemplateLoaderTests(SimpleTestCase):
         self.assertTrue(template_name.endswith(load_name),
             'Cached template loaded through cached loader has incorrect name for debug page: %s' % template_name)
 
-    @override_settings(TEMPLATE_DEBUG=True)
+    @override_settings(DEBUG=True)
     def test_loader_origin(self):
         template = loader.get_template('login.html')
         self.assertEqual(template.origin.loadname, 'login.html')
 
-    @override_settings(TEMPLATE_DEBUG=True)
+    @override_settings(DEBUG=True)
     def test_string_origin(self):
         template = Template('string template')
         self.assertEqual(template.origin.source, 'string template')
@@ -137,15 +142,17 @@ class TemplateLoaderTests(SimpleTestCase):
         template = loader.get_template('login.html')
         self.assertEqual(template.origin, None)
 
-    # TEMPLATE_DEBUG must be true, otherwise the exception raised
-    # during {% include %} processing will be suppressed.
-    @override_settings(TEMPLATE_DEBUG=True)
     # Test the base loader class via the app loader. load_template
     # from base is used by all shipped loaders excepting cached,
     # which has its own test.
     @override_settings(TEMPLATES=[{
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
         'APP_DIRS': True,
+        'OPTIONS': {
+            # Enable debug, otherwise the exception raised during
+            # {% include %} processing will be suppressed.
+            'debug': True,
+        }
     }])
     def test_include_missing_template(self):
         """
@@ -161,15 +168,17 @@ class TemplateLoaderTests(SimpleTestCase):
             self.assertEqual(e.args[0], 'missing.html')
         self.assertEqual(r, None, 'Template rendering unexpectedly succeeded, produced: ->%r<-' % r)
 
-    # TEMPLATE_DEBUG must be true, otherwise the exception raised
-    # during {% include %} processing will be suppressed.
-    @override_settings(TEMPLATE_DEBUG=True)
     # Test the base loader class via the app loader. load_template
     # from base is used by all shipped loaders excepting cached,
     # which has its own test.
     @override_settings(TEMPLATES=[{
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
         'APP_DIRS': True,
+        'OPTIONS': {
+            # Enable debug, otherwise the exception raised during
+            # {% include %} processing will be suppressed.
+            'debug': True,
+        }
     }])
     def test_extends_include_missing_baseloader(self):
         """
@@ -190,6 +199,7 @@ class TemplateLoaderTests(SimpleTestCase):
     @override_settings(TEMPLATES=[{
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
         'OPTIONS': {
+            'debug': True,
             'loaders': [
                 ('django.template.loaders.cached.Loader', [
                     'django.template.loaders.app_directories.Loader',
@@ -197,7 +207,6 @@ class TemplateLoaderTests(SimpleTestCase):
             ],
         },
     }])
-    @override_settings(TEMPLATE_DEBUG=True)
     def test_extends_include_missing_cachedloader(self):
         """
         Same as test_extends_include_missing_baseloader, only tests
@@ -232,19 +241,28 @@ class TemplateLoaderTests(SimpleTestCase):
         output = outer_tmpl.render(ctx)
         self.assertEqual(output, 'This worked!')
 
-    @override_settings(TEMPLATE_DEBUG=True)
+    @override_settings(TEMPLATES=[{
+        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        'OPTIONS': {
+            'debug': True,
+        },
+    }])
     def test_include_immediate_missing(self):
         """
-        Regression test for #16417 -- {% include %} tag raises TemplateDoesNotExist at compile time if TEMPLATE_DEBUG is True
-
         Test that an {% include %} tag with a literal string referencing a
         template that does not exist does not raise an exception at parse
-        time.
+        time. Regression test for #16417.
         """
         tmpl = Template('{% include "this_does_not_exist.html" %}')
         self.assertIsInstance(tmpl, Template)
 
-    @override_settings(TEMPLATE_DEBUG=True)
+    @override_settings(TEMPLATES=[{
+        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        'APP_DIRS': True,
+        'OPTIONS': {
+            'debug': True,
+        },
+    }])
     def test_include_recursive(self):
         comments = [
             {
@@ -274,7 +292,7 @@ class TemplateRegressionTests(SimpleTestCase):
         split = token.split_contents()
         self.assertEqual(split, ["sometag", '_("Page not found")', 'value|yesno:_("yes,no")'])
 
-    @override_settings(SETTINGS_MODULE=None, TEMPLATE_DEBUG=True)
+    @override_settings(SETTINGS_MODULE=None, DEBUG=True)
     def test_url_reverse_no_settings_module(self):
         # Regression test for #9005
         t = Template('{% url will_not_match %}')
@@ -304,7 +322,7 @@ class TemplateRegressionTests(SimpleTestCase):
             self.assertGreater(depth, 5,
                 "The traceback context was lost when reraising the traceback. See #19827")
 
-    @override_settings(DEBUG=True, TEMPLATE_DEBUG=True)
+    @override_settings(DEBUG=True)
     def test_no_wrapped_exception(self):
         """
         The template system doesn't wrap exceptions, but annotates them.
@@ -411,6 +429,16 @@ class TemplateRegressionTests(SimpleTestCase):
         t1 = Template('{% debug %}')
         self.assertIn("清風", t1.render(c1))
 
+    def test_extends_generic_template(self):
+        """
+        {% extends %} accepts django.template.backends.django.Template (#24338).
+        """
+        parent = engines['django'].from_string(
+            '{% block content %}parent{% endblock %}')
+        child = engines['django'].from_string(
+            '{% extends parent %}{% block content %}child{% endblock %}')
+        self.assertEqual(child.render({'parent': parent}), 'child')
+
 
 class TemplateTagLoading(SimpleTestCase):
 
@@ -488,9 +516,6 @@ class RequestContextTests(unittest.TestCase):
         self.assertEqual(len(ctx.dicts), 3)
 
     def test_context_comparable(self):
-        # Create an engine without any context processors.
-        engine = Engine()
-
         test_data = {'x': 'y', 'v': 'z', 'd': {'o': object, 'a': 'b'}}
 
         # test comparing RequestContext to prevent problems if somebody
@@ -498,8 +523,8 @@ class RequestContextTests(unittest.TestCase):
         request = RequestFactory().get('/')
 
         self.assertEqual(
-            RequestContext(request, dict_=test_data, engine=engine),
-            RequestContext(request, dict_=test_data, engine=engine))
+            RequestContext(request, dict_=test_data),
+            RequestContext(request, dict_=test_data))
 
 
 @ignore_warnings(category=RemovedInDjango20Warning)

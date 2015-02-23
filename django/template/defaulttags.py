@@ -2,28 +2,29 @@
 from __future__ import unicode_literals
 
 import os
-import sys
 import re
-from datetime import datetime
-from itertools import groupby, cycle as itertools_cycle
+import sys
 import warnings
+from datetime import datetime
+from itertools import cycle as itertools_cycle, groupby
 
 from django.conf import settings
-from django.template.base import (Node, NodeList, Template, Context, Library,
-    TemplateSyntaxError, VariableDoesNotExist, InvalidTemplateLibrary,
-    BLOCK_TAG_START, BLOCK_TAG_END, VARIABLE_TAG_START, VARIABLE_TAG_END,
-    SINGLE_BRACE_START, SINGLE_BRACE_END, COMMENT_TAG_START, COMMENT_TAG_END,
-    VARIABLE_ATTRIBUTE_SEPARATOR, get_library, token_kwargs, kwarg_re,
-    render_value_in_context)
-from django.template.smartif import IfParser, Literal
+from django.template.base import (
+    BLOCK_TAG_END, BLOCK_TAG_START, COMMENT_TAG_END, COMMENT_TAG_START,
+    SINGLE_BRACE_END, SINGLE_BRACE_START, VARIABLE_ATTRIBUTE_SEPARATOR,
+    VARIABLE_TAG_END, VARIABLE_TAG_START, Context, InvalidTemplateLibrary,
+    Library, Node, NodeList, Template, TemplateSyntaxError,
+    VariableDoesNotExist, get_library, kwarg_re, render_value_in_context,
+    token_kwargs,
+)
 from django.template.defaultfilters import date
+from django.template.smartif import IfParser, Literal
+from django.utils import six, timezone
 from django.utils.deprecation import RemovedInDjango20Warning
 from django.utils.encoding import force_text, smart_text
-from django.utils.lorem_ipsum import words, paragraphs
-from django.utils.safestring import mark_safe
 from django.utils.html import format_html
-from django.utils import six
-from django.utils import timezone
+from django.utils.lorem_ipsum import paragraphs, words
+from django.utils.safestring import mark_safe
 
 register = Library()
 
@@ -93,7 +94,7 @@ class DebugNode(Node):
         from pprint import pformat
         output = [force_text(pformat(val)) for val in context]
         output.append('\n\n')
-        output.append(pformat(sys.modules))
+        output.append(force_text(pformat(sys.modules)))
         return ''.join(output)
 
 
@@ -208,9 +209,9 @@ class ForNode(Node):
                         context.update(unpacked_vars)
                 else:
                     context[self.loopvars[0]] = item
-                # In TEMPLATE_DEBUG mode provide source of the node which
-                # actually raised the exception
-                if context.engine.debug:
+                # In debug mode provide the source of the node which raised
+                # the exception
+                if context.template.engine.debug:
                     for node in self.nodelist_loop:
                         try:
                             nodelist.append(node.render(context))
@@ -391,7 +392,7 @@ class SsiNode(Node):
     def render(self, context):
         filepath = self.filepath.resolve(context)
 
-        if not include_is_allowed(filepath, context.engine.allowed_include_roots):
+        if not include_is_allowed(filepath, context.template.engine.allowed_include_roots):
             if settings.DEBUG:
                 return "[Didn't have permission to include file]"
             else:
@@ -403,7 +404,7 @@ class SsiNode(Node):
             output = ''
         if self.parsed:
             try:
-                t = Template(output, name=filepath, engine=context.engine)
+                t = Template(output, name=filepath, engine=context.template.engine)
                 return t.render(context)
             except TemplateSyntaxError as e:
                 if settings.DEBUG:

@@ -35,6 +35,14 @@ Minor features
 
 * Admin views now have ``model_admin`` or ``admin_site`` attributes.
 
+* The URL of the admin change view has been changed (was at
+  ``/admin/<app>/<model>/<pk>/`` by default and is now at
+  ``/admin/<app>/<model>/<pk>/change/``). This should not affect your
+  application unless you have hardcoded admin URLs. In that case, replace those
+  links by :ref:`reversing admin URLs <admin-reverse-urls>` instead. Note that
+  the old URL still redirects to the new one for backwards compatibility, but
+  it may be removed in a future version.
+
 :mod:`django.contrib.auth`
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -106,7 +114,9 @@ File Uploads
 Forms
 ^^^^^
 
-* ...
+* :class:`~django.forms.ModelForm` accepts the new ``Meta`` option
+  ``field_classes`` to customize the type of the fields. See
+  :ref:`modelforms-overriding-default-fields` for details.
 
 Generic Views
 ^^^^^^^^^^^^^
@@ -127,7 +137,10 @@ Management Commands
 Models
 ^^^^^^
 
-* ...
+* Added the :meth:`RelatedManager.set()
+  <django.db.models.fields.related.RelatedManager.set()>` method to the related
+  managers created by ``ForeignKey``, ``GenericForeignKey``, and
+  ``ManyToManyField``.
 
 Signals
 ^^^^^^^
@@ -137,7 +150,9 @@ Signals
 Templates
 ^^^^^^^^^
 
-* ...
+* Template tags created with the :meth:`~django.template.Library.simple_tag`
+  helper can now store results in a template variable by using the ``as``
+  argument.
 
 Requests and Responses
 ^^^^^^^^^^^^^^^^^^^^^^
@@ -174,6 +189,41 @@ Database backend API
   doesn't implement this. You may want to review the implementation on the
   backends that Django includes for reference (:ticket:`24245`).
 
+Default settings that were tuples are now lists
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The default settings in ``django.conf.global_settings`` were a combination of
+lists and tuples. All settings that were formerly tuples are now lists.
+
+``is_usable`` attribute on template loaders is removed
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Django template loaders previously required an ``is_usable`` attribute to be
+defined. If a loader was configured in the template settings and this attribute
+was ``False``, the loader would be silently ignored. In practice, this was only
+used by the egg loader to detect if setuptools was installed. The ``is_usable``
+attribute is now removed and the egg loader instead fails at runtime if
+setuptools is not installed.
+
+Related set direct assignment
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+:ref:`Direct assignment <direct-assignment>`) used to perform a ``clear()``
+followed by a call to ``add()``. This caused needlessly large data changes
+and prevented using the :data:`~django.db.models.signals.m2m_changed` signal
+to track individual changes in many-to-many relations.
+
+Direct assignment now relies on the the new
+:meth:`django.db.models.fields.related.RelatedManager.set()` method on
+related managers which by default only processes changes between the
+existing related set and the one that's newly assigned. The previous behavior
+can be restored by replacing direct assignment by a call to ``set()`` with
+the keyword argument ``clear=True``.
+
+``ModelForm``, and therefore ``ModelAdmin``, internally rely on direct
+assignment for many-to-many relations and as a consequence now use the new
+behavior.
+
 Miscellaneous
 ~~~~~~~~~~~~~
 
@@ -193,6 +243,15 @@ Miscellaneous
 
 Features deprecated in 1.9
 ==========================
+
+``assignment_tag()``
+~~~~~~~~~~~~~~~~~~~~
+
+Django 1.4 added the ``assignment_tag`` helper to ease the creation of
+template tags that store results in a template variable. The
+:meth:`~django.template.Library.simple_tag` helper has gained this same
+ability, making the ``assignment_tag`` obsolete. Tags that use
+``assignment_tag`` should be updated to use ``simple_tag``.
 
 Miscellaneous
 ~~~~~~~~~~~~~

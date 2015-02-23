@@ -5,17 +5,21 @@ from __future__ import unicode_literals
 
 import unittest
 
+from admin_scripts.tests import AdminScriptTestCase
+
 from django import db
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.core.management import call_command
 from django.db.backends.dummy.base import DatabaseCreation
-from django.test import TestCase, TransactionTestCase, mock, skipUnlessDBFeature
+from django.test import (
+    TestCase, TransactionTestCase, mock, skipUnlessDBFeature,
+)
 from django.test.runner import DiscoverRunner, dependency_ordered
 from django.test.testcases import connections_support_transactions
 from django.utils import six
+from django.utils.encoding import force_text
 
-from admin_scripts.tests import AdminScriptTestCase
 from .models import Person
 
 
@@ -148,30 +152,11 @@ class ManageCommandTests(unittest.TestCase):
                 testrunner='test_runner.NonExistentRunner')
 
 
-class CustomOptionsTestRunner(DiscoverRunner):
-
-    def __init__(self, verbosity=1, interactive=True, failfast=True, option_a=None, option_b=None, option_c=None, **kwargs):
-        super(CustomOptionsTestRunner, self).__init__(verbosity=verbosity, interactive=interactive,
-                                                      failfast=failfast)
-        self.option_a = option_a
-        self.option_b = option_b
-        self.option_c = option_c
-
-    @classmethod
-    def add_arguments(cls, parser):
-        parser.add_argument('--option_a', '-a', action='store', dest='option_a', default='1'),
-        parser.add_argument('--option_b', '-b', action='store', dest='option_b', default='2'),
-        parser.add_argument('--option_c', '-c', action='store', dest='option_c', default='3'),
-
-    def run_tests(self, test_labels, extra_tests=None, **kwargs):
-        print("%s:%s:%s" % (self.option_a, self.option_b, self.option_c))
-
-
 class CustomTestRunnerOptionsTests(AdminScriptTestCase):
 
     def setUp(self):
         settings = {
-            'TEST_RUNNER': '\'test_runner.tests.CustomOptionsTestRunner\'',
+            'TEST_RUNNER': '\'test_runner.runner.CustomOptionsTestRunner\'',
         }
         self.write_settings('settings.py', sdict=settings)
 
@@ -388,7 +373,7 @@ class DeprecationDisplayTest(AdminScriptTestCase):
     def test_runner_deprecation_verbosity_default(self):
         args = ['test', '--settings=test_project.settings', 'test_runner_deprecation_app']
         out, err = self.run_django_admin(args)
-        self.assertIn("Ran 1 test", err)
+        self.assertIn("Ran 1 test", force_text(err))
         six.assertRegex(self, err, r"RemovedInDjango\d\dWarning: warning from test")
         six.assertRegex(self, err, r"RemovedInDjango\d\dWarning: module-level warning from deprecation_app")
 

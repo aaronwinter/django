@@ -7,23 +7,28 @@ from __future__ import unicode_literals
 import sys
 import unittest
 
-from django.contrib.auth.models import User
+from admin_scripts.tests import AdminScriptTestCase
+
 from django.conf import settings
+from django.conf.urls import include
+from django.contrib.auth.models import User
 from django.core.exceptions import ImproperlyConfigured, ViewDoesNotExist
-from django.core.urlresolvers import (reverse, reverse_lazy, resolve, get_callable,
-    get_resolver, NoReverseMatch, Resolver404, ResolverMatch, RegexURLResolver,
-    RegexURLPattern)
-from django.http import HttpRequest, HttpResponseRedirect, HttpResponsePermanentRedirect
+from django.core.urlresolvers import (
+    NoReverseMatch, RegexURLPattern, RegexURLResolver, Resolver404,
+    ResolverMatch, get_callable, get_resolver, resolve, reverse, reverse_lazy,
+)
+from django.http import (
+    HttpRequest, HttpResponsePermanentRedirect, HttpResponseRedirect,
+)
 from django.shortcuts import redirect
-from django.test import TestCase, ignore_warnings, override_settings
+from django.test import (
+    SimpleTestCase, TestCase, ignore_warnings, override_settings,
+)
 from django.utils import six
 from django.utils.deprecation import RemovedInDjango20Warning
 
-from admin_scripts.tests import AdminScriptTestCase
-
-from . import urlconf_outer, middleware, views
+from . import middleware, urlconf_outer, views
 from .views import empty_view
-
 
 resolve_test_data = (
     # These entries are in the format: (path, url_name, app_name, namespace, view_name, func, args, kwargs)
@@ -318,6 +323,17 @@ class ReverseLazyTest(TestCase):
         response = self.client.get('/login_required_view/')
         self.assertEqual(response.status_code, 200)
 
+    def test_inserting_reverse_lazy_into_string(self):
+        self.assertEqual(
+            'Some URL: %s' % reverse_lazy('some-login-page'),
+            'Some URL: /login/'
+        )
+        if six.PY2:
+            self.assertEqual(
+                b'Some URL: %s' % reverse_lazy('some-login-page'),
+                'Some URL: /login/'
+            )
+
 
 class ReverseLazySettingsTest(AdminScriptTestCase):
     """
@@ -386,7 +402,7 @@ class ReverseShortcutTests(TestCase):
     @ignore_warnings(category=RemovedInDjango20Warning)
     def test_reverse_by_path_nested(self):
         # Views that are added to urlpatterns using include() should be
-        # reversible by doted path.
+        # reversible by dotted path.
         self.assertEqual(reverse('urlpatterns_reverse.views.nested_view'), '/includes/nested_path/')
 
     def test_redirect_view_object(self):
@@ -527,9 +543,9 @@ class RequestURLconfTests(TestCase):
         self.assertEqual(response.status_code, 404)
 
     @override_settings(
-        MIDDLEWARE_CLASSES=(
+        MIDDLEWARE_CLASSES=[
             '%s.ChangeURLconfMiddleware' % middleware.__name__,
-        )
+        ]
     )
     def test_urlconf_overridden(self):
         response = self.client.get('/test/me/')
@@ -541,18 +557,18 @@ class RequestURLconfTests(TestCase):
         self.assertEqual(response.content, b'outer:,inner:/second_test/')
 
     @override_settings(
-        MIDDLEWARE_CLASSES=(
+        MIDDLEWARE_CLASSES=[
             '%s.NullChangeURLconfMiddleware' % middleware.__name__,
-        )
+        ]
     )
     def test_urlconf_overridden_with_null(self):
         self.assertRaises(ImproperlyConfigured, self.client.get, '/test/me/')
 
     @override_settings(
-        MIDDLEWARE_CLASSES=(
+        MIDDLEWARE_CLASSES=[
             '%s.ChangeURLconfMiddleware' % middleware.__name__,
             '%s.ReverseInnerInResponseMiddleware' % middleware.__name__,
-        )
+        ]
     )
     def test_reverse_inner_in_response_middleware(self):
         """
@@ -564,10 +580,10 @@ class RequestURLconfTests(TestCase):
         self.assertEqual(response.content, b'/second_test/')
 
     @override_settings(
-        MIDDLEWARE_CLASSES=(
+        MIDDLEWARE_CLASSES=[
             '%s.ChangeURLconfMiddleware' % middleware.__name__,
             '%s.ReverseOuterInResponseMiddleware' % middleware.__name__,
-        )
+        ]
     )
     def test_reverse_outer_in_response_middleware(self):
         """
@@ -579,10 +595,10 @@ class RequestURLconfTests(TestCase):
             self.client.get('/second_test/')
 
     @override_settings(
-        MIDDLEWARE_CLASSES=(
+        MIDDLEWARE_CLASSES=[
             '%s.ChangeURLconfMiddleware' % middleware.__name__,
             '%s.ReverseInnerInStreaming' % middleware.__name__,
-        )
+        ]
     )
     def test_reverse_inner_in_streaming(self):
         """
@@ -594,10 +610,10 @@ class RequestURLconfTests(TestCase):
         self.assertEqual(b''.join(response), b'/second_test/')
 
     @override_settings(
-        MIDDLEWARE_CLASSES=(
+        MIDDLEWARE_CLASSES=[
             '%s.ChangeURLconfMiddleware' % middleware.__name__,
             '%s.ReverseOuterInStreaming' % middleware.__name__,
-        )
+        ]
     )
     def test_reverse_outer_in_streaming(self):
         """
@@ -736,3 +752,10 @@ class ViewLoadingTests(TestCase):
         # swallow it.
         self.assertRaises(AttributeError, get_callable,
                           'urlpatterns_reverse.views_broken.i_am_broken')
+
+
+class IncludeTests(SimpleTestCase):
+    def test_include_app_name_but_no_namespace(self):
+        msg = "Must specify a namespace if specifying app_name."
+        with self.assertRaisesMessage(ValueError, msg):
+            include('urls', app_name='bar')

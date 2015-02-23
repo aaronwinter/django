@@ -1,10 +1,9 @@
-from django.core import exceptions
+from psycopg2.extras import DateRange, DateTimeTZRange, NumericRange
+
 from django import forms
+from django.core import exceptions
 from django.forms.widgets import MultiWidget
 from django.utils.translation import ugettext_lazy as _
-
-from psycopg2.extras import NumericRange, DateRange, DateTimeTZRange
-
 
 __all__ = ['IntegerRangeField', 'FloatRangeField', 'DateTimeRangeField', 'DateRangeField']
 
@@ -50,21 +49,25 @@ class BaseRangeField(forms.MultiValueField):
 
 
 class IntegerRangeField(BaseRangeField):
+    default_error_messages = {'invalid': _('Enter two whole numbers.')}
     base_field = forms.IntegerField
     range_type = NumericRange
 
 
 class FloatRangeField(BaseRangeField):
+    default_error_messages = {'invalid': _('Enter two numbers.')}
     base_field = forms.FloatField
     range_type = NumericRange
 
 
 class DateTimeRangeField(BaseRangeField):
+    default_error_messages = {'invalid': _('Enter two valid date/times.')}
     base_field = forms.DateTimeField
     range_type = DateTimeTZRange
 
 
 class DateRangeField(BaseRangeField):
+    default_error_messages = {'invalid': _('Enter two valid dates.')}
     base_field = forms.DateField
     range_type = DateRange
 

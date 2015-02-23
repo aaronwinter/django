@@ -1,14 +1,16 @@
 import os
 import sys
-from types import ModuleType
 import unittest
 import warnings
+from types import ModuleType
 
 from django.conf import LazySettings, Settings, settings
 from django.core.exceptions import ImproperlyConfigured
 from django.http import HttpRequest
-from django.test import (SimpleTestCase, TransactionTestCase, TestCase,
-    modify_settings, override_settings, signals)
+from django.test import (
+    SimpleTestCase, TestCase, TransactionTestCase, modify_settings,
+    override_settings, signals,
+)
 from django.utils import six
 from django.utils.encoding import force_text
 
@@ -441,12 +443,12 @@ class IsOverriddenTest(TestCase):
             self.assertTrue(settings.is_overridden('ALLOWED_HOSTS'))
 
 
-class TestTupleSettings(unittest.TestCase):
+class TestListSettings(unittest.TestCase):
     """
-    Make sure settings that should be tuples throw ImproperlyConfigured if they
-    are set to a string instead of a tuple.
+    Make sure settings that should be lists or tuples throw
+    ImproperlyConfigured if they are set to a string instead of a list or tuple.
     """
-    tuple_settings = (
+    list_or_tuple_settings = (
         "ALLOWED_INCLUDE_ROOTS",
         "INSTALLED_APPS",
         "TEMPLATE_DIRS",
@@ -456,8 +458,8 @@ class TestTupleSettings(unittest.TestCase):
     def test_tuple_settings(self):
         settings_module = ModuleType('fake_settings_module')
         settings_module.SECRET_KEY = 'foo'
-        for setting in self.tuple_settings:
-            setattr(settings_module, setting, ('non_tuple_value'))
+        for setting in self.list_or_tuple_settings:
+            setattr(settings_module, setting, ('non_list_or_tuple_value'))
             sys.modules['fake_settings_module'] = settings_module
             try:
                 with self.assertRaises(ImproperlyConfigured):

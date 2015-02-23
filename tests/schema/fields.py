@@ -1,9 +1,8 @@
 from django.db.models.fields.related import (
-    create_many_to_many_intermediary_model,
+    RECURSIVE_RELATIONSHIP_CONSTANT, ManyRelatedObjectsDescriptor,
     ManyToManyField, ManyToManyRel, RelatedField,
-    RECURSIVE_RELATIONSHIP_CONSTANT, ReverseManyRelatedObjectsDescriptor,
+    create_many_to_many_intermediary_model,
 )
-
 from django.utils.functional import curry
 
 
@@ -41,7 +40,7 @@ class CustomManyToManyField(RelatedField):
         super(CustomManyToManyField, self).contribute_to_class(cls, name, **kwargs)
         if not self.rel.through and not cls._meta.abstract and not cls._meta.swapped:
             self.rel.through = create_many_to_many_intermediary_model(self, cls)
-        setattr(cls, self.name, ReverseManyRelatedObjectsDescriptor(self))
+        setattr(cls, self.name, ManyRelatedObjectsDescriptor(self.rel))
         self.m2m_db_table = curry(self._get_m2m_db_table, cls._meta)
 
     def get_internal_type(self):
@@ -52,3 +51,7 @@ class CustomManyToManyField(RelatedField):
     _get_m2m_attr = ManyToManyField.__dict__['_get_m2m_attr']
     _get_m2m_reverse_attr = ManyToManyField.__dict__['_get_m2m_reverse_attr']
     _get_m2m_db_table = ManyToManyField.__dict__['_get_m2m_db_table']
+
+
+class InheritedManyToManyField(ManyToManyField):
+    pass

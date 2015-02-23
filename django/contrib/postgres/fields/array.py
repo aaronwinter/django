@@ -4,10 +4,9 @@ from django.contrib.postgres import lookups
 from django.contrib.postgres.forms import SimpleArrayField
 from django.contrib.postgres.validators import ArrayMaxLengthValidator
 from django.core import checks, exceptions
-from django.db.models import Field, Transform, IntegerField
+from django.db.models import Field, IntegerField, Transform
 from django.utils import six
 from django.utils.translation import string_concat, ugettext_lazy as _
-
 
 __all__ = ['ArrayField']
 
@@ -138,6 +137,18 @@ class ArrayField(Field):
                 raise exceptions.ValidationError(
                     self.error_messages['nested_array_mismatch'],
                     code='nested_array_mismatch',
+                )
+
+    def run_validators(self, value):
+        super(ArrayField, self).run_validators(value)
+        for i, part in enumerate(value):
+            try:
+                self.base_field.run_validators(part)
+            except exceptions.ValidationError as e:
+                raise exceptions.ValidationError(
+                    string_concat(self.error_messages['item_invalid'], ' '.join(e.messages)),
+                    code='item_invalid',
+                    params={'nth': i},
                 )
 
     def formfield(self, **kwargs):

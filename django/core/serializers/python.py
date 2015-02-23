@@ -9,8 +9,8 @@ from django.apps import apps
 from django.conf import settings
 from django.core.serializers import base
 from django.db import DEFAULT_DB_ALIAS, models
-from django.utils.encoding import force_text, is_protected_type
 from django.utils import six
+from django.utils.encoding import force_text, is_protected_type
 
 
 class Serializer(base.Serializer):
@@ -63,6 +63,8 @@ class Serializer(base.Serializer):
                 value = None
         else:
             value = getattr(obj, field.get_attname())
+            if not is_protected_type(value):
+                value = field.value_to_string(obj)
         self._current[field.name] = value
 
     def handle_m2m_field(self, obj, field):
